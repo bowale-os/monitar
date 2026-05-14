@@ -1,0 +1,1 @@
+- 2026-05-13: I made the base models for this project and set up a git project
