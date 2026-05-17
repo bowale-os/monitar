@@ -6,3 +6,5 @@ httpx
 beautifulsoup4
 google-cloud-aiplatform
 pydantic
+google-auth
+authlib
