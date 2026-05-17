@@ -1,2 +1,3 @@
 - 2026-05-13: I made the base models for this project and set up a git project
 - 2026-05-14: We made the connection between mongodb and python
+- 2026-05-16: saved auth details to mongodb
