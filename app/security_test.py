@@ -11,6 +11,8 @@ class TestSecurity(unittest.TestCase):
         converted = security.verify_password(password, hash)
         self.assertTrue(converted)
 
+
+    #added a token expiration time, test doesnt really matter
     def test_create_access_token(self):
         """test that the create_access_token function returns a string that is not the same as the original user_id"""
         user_id = "_929302838h9@2$"
