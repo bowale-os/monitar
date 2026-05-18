@@ -8,3 +8,5 @@ google-cloud-aiplatform
 pydantic
 google-auth
 authlib
+bcrypt
+python-jose

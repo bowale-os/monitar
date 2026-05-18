@@ -1,8 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
 class User(BaseModel):
-    email: str
+    email: EmailStr
     name: str
     picture: str | None = None
     created_at: datetime
