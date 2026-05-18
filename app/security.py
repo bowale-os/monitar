@@ -22,7 +22,7 @@ def hash_password(password: str) -> str:
     password_bytes = password.encode('utf-8')
     hashed_password = bcrypt.hashpw(password_bytes, bcrypt.gensalt(rounds=8))
 
-    return hashed_password
+    return hashed_password.decode('utf-8')
 
 
 def verify_password(password:str, hashed:str) -> bool:
@@ -53,7 +53,7 @@ def verify_access_token(access_token:str) -> str:
     convert token from frontend to user_id for security checks
     """
 
-    user_id = jws.verify(token=access_token, key=SECRET_KEY, algorithms=ALGORITHM)
+    user_id = jws.verify(token=access_token, key=SECRET_KEY, algorithms=ALGORITHM).decode('utf-8')
     return user_id
 
 

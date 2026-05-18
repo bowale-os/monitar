@@ -9,4 +9,4 @@ pydantic
 google-auth
 authlib
 bcrypt
-python-jose
+python-jose[cryptography]
