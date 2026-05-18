@@ -1,8 +1,3 @@
-#create access token function
-#verify access token function
-#create hash password fuunction
-#create verify hash function
-
 from jose import jws
 from dotenv import load_dotenv
 import bcrypt

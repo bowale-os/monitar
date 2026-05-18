@@ -10,3 +10,4 @@ google-auth
 authlib
 bcrypt
 python-jose[cryptography]
+pydantic[email]
