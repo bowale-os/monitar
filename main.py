@@ -3,10 +3,10 @@ from pydantic import BaseModel
 from typing import Optional
 import os
 
-from app.api.auth import router
+from app.api import main_router
 
 app = FastAPI(
 )
 
-app.include_router(router)
+app.include_router(main_router)
 
