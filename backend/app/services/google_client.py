@@ -1,8 +1,10 @@
 from authlib.integrations.starlette_client import OAuth
 from dotenv import load_dotenv
+from pathlib import Path
 import os
 
-load_dotenv()
+# .env lives at backend/app/.env — two levels up from this services/ file.
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 SECRET_KEY = os.getenv("SECRET_KEY")

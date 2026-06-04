@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 import os
 
-from app.api import main_router
+from backend.app.api import main_router
 
 app = FastAPI(
 )
