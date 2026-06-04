@@ -4,3 +4,4 @@ development-plan.md
 __pycache__
 /store
 *.zip
+/icons
