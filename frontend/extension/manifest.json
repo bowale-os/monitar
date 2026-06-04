@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Monitar",
+  "version": "0.1.0",
+  "description": "Start a session, browse, and Monitar tracks your tabs and saves them to your account.",
+  "permissions": ["tabs", "storage", "alarms"],
+  "host_permissions": ["http://localhost:8000/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Monitar"
+  }
+}

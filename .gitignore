@@ -1,3 +1,4 @@
 .venv
-development-plan.md
 .env
+development-plan.md
+__pycache__
