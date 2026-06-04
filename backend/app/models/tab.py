@@ -9,5 +9,3 @@ class Tab(BaseModel):
     time_spent: int
     time_since_prev: int
     is_last_opened: bool
-    fetched: bool
-    page_snippet: str | None
