@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Start a session, browse, and Monitar tracks your tabs and saves them to your account.",
   "permissions": ["tabs", "storage", "alarms"],
-  "host_permissions": ["https://monitar.up.railway.app"],
+  "host_permissions": ["https://monitar.up.railway.app/*"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

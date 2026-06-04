@@ -1,8 +1,12 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 
 from .api import main_router
 from .services.mongo_client import init_indexes
+
+PRIVACY_PAGE = Path(__file__).resolve().parent / "privacy.html"
 
 
 @asynccontextmanager
@@ -13,5 +17,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Monitar", lifespan=lifespan)
+
+
+# Registered before the router so it isn't shadowed by retrieval's GET /{session_id}.
+@app.get("/privacy", include_in_schema=False)
+async def privacy_policy():
+    return FileResponse(PRIVACY_PAGE, media_type="text/html")
+
 
 app.include_router(main_router)
