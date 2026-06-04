@@ -294,9 +294,12 @@ async function handleSignout() {
     await chrome.runtime.sendMessage({ type: "ABORT_SESSION" });
   } catch (_) {}
   await chrome.storage.local.clear();
-  // Clear the visible fields too, since the popup stays open after sign-out.
+  // Clear the visible fields and the rendered session list so the next person
+  // doesn't see the previous user's data (it stays safe in their account).
   authForm.reset();
   intentInput.value = "";
+  sessionList.innerHTML = "";
+  emptyState.classList.add("hidden");
   clearStatus();
   setAuthMode("signin");
   showAuthView();
