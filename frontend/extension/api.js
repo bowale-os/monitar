@@ -1,5 +1,5 @@
 // Central place to change where the backend lives.
-const API_BASE = "http://localhost:8000";
+const API_BASE = "https://monitar.up.railway.app";
 
 // Thrown when the access token is rejected and the refresh token can't renew
 // it — the user must sign in again.
