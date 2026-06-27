@@ -1,11 +1,5 @@
 .venv
 .env
-development-plan.md
-__pycache__
-<<<<<<< HEAD
 /store
 *.zip
 /icons
-=======
-*.zip
->>>>>>> c26fea0 (updated gitignore)
