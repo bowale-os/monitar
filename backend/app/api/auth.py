@@ -2,7 +2,7 @@ from fastapi import APIRouter, status, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime, timezone, timedelta
 from pymongo.errors import DuplicateKeyError
-
+import os, base64
 
 from ..services.mongo_client import database
 from ..security import (
@@ -46,11 +46,15 @@ async def issue_refresh_token(user_id: str) -> str:
 
 @a_router.post("/sign-up", status_code=status.HTTP_201_CREATED)
 async def sign_up(request: SignUpRequest):
+    
+    salt = base64.b64encode(os.urandom(16)).decode()
     data = request.model_dump()
 
     hashed_password = hash_password(data["password"])
     data["password"] = hashed_password
     data["created_at"] = datetime.now(timezone.utc)
+    data["enc_salt"] = salt
+
 
     # The unique index on users.email is the real guard; the try/except turns a
     # duplicate (including a concurrent-signup race) into a clean 400.
@@ -67,6 +71,7 @@ async def sign_up(request: SignUpRequest):
         "message": "You signed up successfully",
         "access_token": access_token,
         "refresh_token": refresh_token,
+        "enc_salt": salt
     }
 
 
@@ -100,6 +105,7 @@ async def sign_in(request: SignInRequest):
             "email": existing_user["email"],
             "name": existing_user["name"],
         },
+        "enc_salt": existing_user["enc_salt"],
         "access_token": access_token,
         "refresh_token": refresh_token,
     }
@@ -132,12 +138,15 @@ async def refresh(request: RefreshRequest):
         raise invalid_token
 
     user_id = record["user_id"]
+    user = await database.users.find_one({"_id": user_id})
+
     access_token = create_access_token(user_id)
     refresh_token = await issue_refresh_token(user_id)
 
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
+        "enc_salt": user["enc_salt"]
     }
 
 

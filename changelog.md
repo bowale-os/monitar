@@ -7,3 +7,5 @@ Tested the security.py file with the unittest package
 
 added user data to be returned by sign-in route
 started a storage.py route that can store session data, and I tested it.. storage was meant for a new branch, though
+
+- 2026-06-24: I changed the Session Model to reflect the encrypted frontend data
