@@ -290,8 +290,11 @@ async function handleAuth(e) {
         ? await api.signUp(nameInput.value.trim(), email, password)
         : await api.signIn(email, password);
 
-    await setTokens(res);
+    if (!res.enc_salt) {
+      throw new Error("Authentication response missing encryption salt");
+    }
     await deriveAndStoreKey(password, res.enc_salt);
+    await setTokens(res);
     authForm.reset();
     clearAuthDraft();
     showMainView();
