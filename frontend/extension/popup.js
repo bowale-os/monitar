@@ -1,4 +1,5 @@
 import { api, getTokens, setTokens, SessionExpiredError } from "./api.js";
+import { deriveAndStoreKey, clearKey, loadKey, decrypt} from "./crypto.js";
 
 // --- element refs ---
 const authView = document.getElementById("auth-view");
@@ -149,7 +150,7 @@ function renderSessions(sessions) {
   emptyState.classList.toggle("hidden", sessions.length > 0);
 
   for (const s of sessions) {
-    const count = Array.isArray(s.tabs) ? s.tabs.length : 0;
+    const count = s.tab_count ?? 0;
 
     const li = document.createElement("li");
     li.className = "session";
@@ -198,11 +199,27 @@ async function restoreSession(id, btn) {
   btn.disabled = true;
   try {
     const { data } = await api.getSession(id);
-    const urls = (data.tabs || []).map((t) => t.url).filter(Boolean);
+
+    if (!data.content_encrypted) {
+      showStatus("This session has no restorable content.");
+      return;
+    }
+
+    const key = await loadKey();
+    if (!key) {
+      showStatus("You need to sign in again to restore sessions.");
+      return;
+    }
+
+    const payload = await decrypt(key, data.content_encrypted);
+
+    const urls = (payload.tabs || []).map((t) => t.url).filter(Boolean);
+    
     if (urls.length === 0) {
       showStatus("This session has no restorable tabs.");
       return;
     }
+
     await chrome.windows.create({ url: urls });
   } catch (err) {
     handleError(err);
@@ -273,6 +290,10 @@ async function handleAuth(e) {
         ? await api.signUp(nameInput.value.trim(), email, password)
         : await api.signIn(email, password);
 
+    if (!res.enc_salt) {
+      throw new Error("Authentication response missing encryption salt");
+    }
+    await deriveAndStoreKey(password, res.enc_salt);
     await setTokens(res);
     authForm.reset();
     clearAuthDraft();
@@ -293,6 +314,7 @@ async function handleSignout() {
   try {
     await chrome.runtime.sendMessage({ type: "ABORT_SESSION" });
   } catch (_) {}
+  await clearKey();
   await chrome.storage.local.clear();
   // Clear the visible fields and the rendered session list so the next person
   // doesn't see the previous user's data (it stays safe in their account).
@@ -313,10 +335,20 @@ startForm.addEventListener("submit", handleStart);
 stopBtn.addEventListener("click", handleStop);
 signoutBtn.addEventListener("click", handleSignout);
 
+
 // Persist drafts as the user types (password is intentionally excluded).
 emailInput.addEventListener("input", saveAuthDraft);
 nameInput.addEventListener("input", saveAuthDraft);
 intentInput.addEventListener("input", saveIntentDraft);
+
+window.addEventListener("focus", async () => {   // ← add this
+  const { access_token } = await getTokens();
+  if (access_token) {
+    await loadSessions();
+    await refreshSessionUI();
+  }
+});
+
 
 // --- init ---
 (async function init() {
@@ -324,6 +356,13 @@ intentInput.addEventListener("input", saveIntentDraft);
   await loadAuthDraft();
   const { access_token } = await getTokens();
   if (access_token) {
+    
+    const key = await loadKey();        // ← add this
+    if (!key) {                         // ← and this
+      showAuthView();                   // key gone, need password again
+      return;
+    }
+
     showMainView();
     await refreshSessionUI();
     await loadSessions();

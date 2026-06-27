@@ -1,17 +1,19 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 from .tab import Tab
 
-class Session(BaseModel):
-    intent: str
-    started_at: datetime
-    stopped_at: datetime
-    tabs: List[Tab]
+class BaseSchema(BaseModel):
+    model_config = ConfigDict(
+        json_encoders={datetime: lambda v: v.isoformat().replace("+00:00", "Z")}
+    )
 
-    @field_validator('started_at', 'stopped_at')
-    @classmethod
-    def ensure_utc(cls, v):
-        if v.tzinfo is None:
-            return v.replace(tzinfo=timezone.utc)
-        return v
+class Session(BaseSchema):
+    intent: Optional[str] = None
+    started_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    content_encrypted: Optional[str] = None
+    content_hash: Optional[str] = None
+    embedding: Optional[List[float]] = None
+    tab_count: Optional[int] = None

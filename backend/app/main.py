@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from .api import main_router
 from .services.mongo_client import init_indexes
@@ -17,6 +18,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Monitar", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # Registered before the router so it isn't shadowed by retrieval's GET /{session_id}.

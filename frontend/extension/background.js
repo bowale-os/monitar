@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { loadKey, encrypt } from "./crypto.js";
 
 // MV3 service workers are killed when idle and restarted on events, so NOTHING
 // can live in module-scope variables between events. The whole session state
@@ -106,13 +107,29 @@ async function flush() {
     return true;
   }
 
+  const key = await loadKey();
+  if (!key) {
+    console.warn("[monitar] no encryption key available, skipping flush");
+    return false;
+  }
+
+  const content_encrypted = await encrypt(key, payload);
+
+  const envelope = {
+    content_encrypted,
+    intent: payload.intent,
+    tab_count: payload.tabs.length,
+    started_at: payload.started_at,
+  };
+
   try {
     if (!s.backend_id) {
-      const res = await api.storeSession(payload);
+      const res = await api.storeSession(envelope);
       s.backend_id = res.id;
     } else {
-      await api.updateSession(s.backend_id, payload);
+      await api.updateSession(s.backend_id, envelope);
     }
+
     await setState(s); // persist banked time + backend_id
     return true;
   } catch (e) {
