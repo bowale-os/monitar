@@ -3,6 +3,7 @@ from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime, timezone, timedelta
 from pymongo.errors import DuplicateKeyError
 import os, base64
+from bson import ObjectId
 
 from ..services.mongo_client import database
 from ..security import (
@@ -119,6 +120,9 @@ async def refresh(request: RefreshRequest):
     """
     token_hash = hash_refresh_token(request.refresh_token)
 
+    # check if it exists before deleting
+    existing = await database.refresh_tokens.find_one({"token_hash": token_hash})
+
     # Atomically consume the token: only one rotation can win.
     record = await database.refresh_tokens.find_one_and_delete({"token_hash": token_hash})
 
@@ -138,8 +142,10 @@ async def refresh(request: RefreshRequest):
         raise invalid_token
 
     user_id = record["user_id"]
-    user = await database.users.find_one({"_id": user_id})
-
+    user = await database.users.find_one({"_id": ObjectId(user_id)})
+    
+    if not user:
+        raise invalid_token
     access_token = create_access_token(user_id)
     refresh_token = await issue_refresh_token(user_id)
 

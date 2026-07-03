@@ -49,9 +49,20 @@
       <button id="stop-btn">Stop &amp; save session</button>
     </div>
 
-    <h2>Saved sessions</h2>
-    <ul id="session-list"></ul>
-    <p id="empty-state" class="muted hidden">No saved sessions yet.</p>
+    <div class="search-wrap">
+      <input id="search-input" type="search" placeholder="Smart search sessions…" autocomplete="off" />
+      <span id="search-spinner" class="search-spinner hidden"></span>
+    </div>
+    <p id="model-status" class="model-status hidden"></p>
+
+    <div id="sessions-section">
+      <h2>Saved sessions</h2>
+      <ul id="session-list"></ul>
+      <p id="empty-state" class="muted hidden">No saved sessions yet.</p>
+    </div>
+
+    <ul id="search-results" class="hidden"></ul>
+    <p id="no-results" class="muted hidden">No matching sessions found.</p>
   </section>
 
   <p id="status" class="status hidden"></p>

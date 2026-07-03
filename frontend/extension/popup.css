@@ -147,6 +147,36 @@ button:disabled { opacity: .6; cursor: default; }
 }
 .delete-btn:hover { background: #fbdcdc; }
 
+.search-wrap {
+  position: relative;
+  margin: 14px 0 4px;
+}
+.search-wrap input {
+  margin-bottom: 0;
+  padding-right: 34px;
+}
+.search-spinner {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border: 2px solid #d4d4d4;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
+
+.model-status {
+  font-size: 12px;
+  color: #888;
+  margin: 4px 0 0;
+}
+
+#search-results { list-style: none; margin: 4px 0 0; padding: 0; }
+
 .status {
   margin: 12px 0 0;
   padding: 8px 10px;
