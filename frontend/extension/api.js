@@ -45,25 +45,41 @@ async function rawFetch(path, { method = "GET", body, token } = {}) {
 
 // Rotate the refresh token; returns a fresh access token or throws
 // SessionExpiredError (and clears storage) if it can't.
+let refreshPromise = null;
+
 async function doRefresh() {
-  const { refresh_token } = await getTokens();
-  if (!refresh_token) {
-    await clearTokens();
-    throw new SessionExpiredError();
-  }
+  if (refreshPromise) return refreshPromise;  // ← reuse in-flight refresh
 
-  const { res, data } = await rawFetch("/refresh", {
-    method: "POST",
-    body: { refresh_token },
-  });
+  refreshPromise = (async () => {
+    try {
+      const { refresh_token } = await getTokens();
+      if (!refresh_token) {
+        await clearTokens();
+        throw new SessionExpiredError();
+      }
 
-  if (!res.ok) {
-    await clearTokens();
-    throw new SessionExpiredError();
-  }
+      const { res, data } = await rawFetch("/refresh", {
+        method: "POST",
+        body: { refresh_token },
+      });
 
-  await setTokens({ access_token: data.access_token, refresh_token: data.refresh_token });
-  return data.access_token;
+      if (!res.ok) {
+        await clearTokens();
+        throw new SessionExpiredError();
+      }
+
+      await setTokens({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      });
+
+      return data.access_token;
+    } finally {
+      refreshPromise = null;  // ← clear when done
+    }
+  })();
+
+  return refreshPromise;
 }
 
 // Main wrapper: attaches the access token and, on a 401, transparently rotates
@@ -96,6 +112,7 @@ export const api = {
   listSessions: () => request("/"),
   getSession: (id) => request(`/${id}`),
   deleteSession: (id) => request(`/${id}`, { method: "DELETE" }),
+  searchSessions: (vector) => request("/search", { method: "POST", body: { vector } }),
   refresh: doRefresh,
   logout: async () => {
     const { refresh_token } = await getTokens();

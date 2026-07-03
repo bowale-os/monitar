@@ -17,3 +17,4 @@ class Session(BaseSchema):
     content_hash: Optional[str] = None
     embedding: Optional[List[float]] = None
     tab_count: Optional[int] = None
+    window_count: Optional[int] = None

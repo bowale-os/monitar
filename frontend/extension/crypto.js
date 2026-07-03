@@ -1,6 +1,6 @@
 // crypto.js
 
-const KEY_STORAGE = "enc_key_jwk";
+const KEY_STORAGE = "23wdf@#%^&^&fvfbxfy74sdf$#$@#$%^";
 
 function bufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
@@ -92,4 +92,11 @@ export async function decrypt(key, base64) {
   );
 
   return JSON.parse(new TextDecoder().decode(plaintext));
+}
+
+
+export async function hashPayload(payload) {
+  const encoded = new TextEncoder().encode(JSON.stringify(payload));
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+  return bufferToBase64(hashBuffer);
 }

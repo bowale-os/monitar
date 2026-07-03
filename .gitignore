@@ -3,3 +3,4 @@
 /store
 *.zip
 /icons
+__pycache__
