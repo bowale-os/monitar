@@ -254,6 +254,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) flush();
 });
 
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === "install") {
+    chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") });
+  }
+});
+
 // --- popup <-> worker messaging ---
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {

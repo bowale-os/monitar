@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Welcome to Monitar</title>
+  <link rel="stylesheet" href="onboarding.css" />
+</head>
+<body>
+  <div class="card">
+    <header class="brand">
+      <span class="brand-mark">M</span>
+      <span>Monitar</span>
+    </header>
+
+    <section class="step" id="step-welcome">
+      <h1>Never lose your train of thought again.</h1>
+      <p class="lead">
+        You close 40 tabs at the end of a deep research session, and by tomorrow
+        you can't remember why half of them mattered. Monitar remembers for you.
+      </p>
+      <p>
+        Start a session, browse like you normally do, and Monitar quietly saves
+        the full context — every tab, every group — so you can pick it back up
+        in seconds, days or weeks later.
+      </p>
+    </section>
+
+    <section class="step hidden" id="step-how">
+      <h1>How it works</h1>
+      <ol class="steps-list">
+        <li><strong>Hit Start</strong> when you begin a task — "Q3 budget research", "apartment hunting", whatever it is.</li>
+        <li><strong>Browse however you want</strong> — nothing to remember, nothing to manage.</li>
+        <li><strong>Stop, and it's saved.</strong> Find it again in one search, weeks from now, by typing what you were doing — not the exact title or URL.</li>
+      </ol>
+      <p class="callout">
+        That last part is the whole point: searching by what you were doing, not
+        what you called it.
+      </p>
+    </section>
+
+    <section class="step hidden" id="step-privacy">
+      <h1>Your browsing stays yours.</h1>
+      <p class="lead">
+        Session content is encrypted on your device before it ever leaves your
+        browser — Monitar's servers never see your tabs in plaintext.
+      </p>
+      <ul class="perm-list">
+        <li>Sees your open tabs <strong>only while a session is running.</strong></li>
+        <li>Remembers tab groups so restored sessions look the way you left them.</li>
+        <li>Runs a save timer locally — no constant background tracking.</li>
+      </ul>
+    </section>
+
+    <section class="step hidden" id="step-ready">
+      <h1>One-time setup, then it's instant.</h1>
+      <p class="lead">
+        The first time you search, Monitar downloads a small on-device search
+        model — a few seconds, once, cached after that. Everything after is
+        instant, and nothing about your search ever leaves your device.
+      </p>
+      <p class="pointer">Click the Monitar icon next to your address bar to begin.</p>
+    </section>
+
+    <footer>
+      <div class="dots">
+        <span class="dot active" data-index="0"></span>
+        <span class="dot" data-index="1"></span>
+        <span class="dot" data-index="2"></span>
+        <span class="dot" data-index="3"></span>
+      </div>
+      <div class="nav-buttons">
+        <button id="back-btn" class="link hidden">Back</button>
+        <button id="next-btn">Next</button>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="onboarding.js"></script>
+</body>
+</html>
