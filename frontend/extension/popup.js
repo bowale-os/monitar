@@ -65,6 +65,12 @@ function buildEmbedText(payload) {
 }
 
 // --- element refs ---
+const onboardingView = document.getElementById("onboarding-view");
+const obSteps = [...document.querySelectorAll(".ob-step")];
+const obDots = [...document.querySelectorAll(".ob-dot")];
+const obBackBtn = document.getElementById("ob-back-btn");
+const obNextBtn = document.getElementById("ob-next-btn");
+
 const authView = document.getElementById("auth-view");
 const mainView = document.getElementById("main-view");
 const signoutBtn = document.getElementById("signout-btn");
@@ -215,8 +221,46 @@ async function refreshSessionUI() {
 
 }
 
+// --- onboarding ---
+const ONBOARDED_KEY = "has_onboarded";
+let obIndex = 0;
+
+function showOnboardingStep(index) {
+  obSteps.forEach((step, i) => step.classList.toggle("hidden", i !== index));
+  obDots.forEach((dot, i) => dot.classList.toggle("active", i === index));
+  obBackBtn.classList.toggle("hidden", index === 0);
+  obNextBtn.textContent = index === obSteps.length - 1 ? "Start my first session" : "Next";
+  obIndex = index;
+}
+
+function showOnboardingView() {
+  onboardingView.classList.remove("hidden");
+  authView.classList.add("hidden");
+  mainView.classList.add("hidden");
+  signoutBtn.classList.add("hidden");
+  showOnboardingStep(0);
+}
+
+async function finishOnboarding() {
+  await chrome.storage.local.set({ [ONBOARDED_KEY]: true });
+  onboardingView.classList.add("hidden");
+  showAuthView();
+}
+
+obBackBtn.addEventListener("click", () => {
+  if (obIndex > 0) showOnboardingStep(obIndex - 1);
+});
+obNextBtn.addEventListener("click", () => {
+  if (obIndex < obSteps.length - 1) {
+    showOnboardingStep(obIndex + 1);
+  } else {
+    finishOnboarding();
+  }
+});
+
 // --- views ---
 function showAuthView() {
+  onboardingView.classList.add("hidden");
   authView.classList.remove("hidden");
   mainView.classList.add("hidden");
   signoutBtn.classList.add("hidden");
@@ -594,6 +638,12 @@ window.addEventListener("focus", async () => {   // ← add this
 
 // --- init ---
 (async function init() {
+  const { [ONBOARDED_KEY]: hasOnboarded } = await chrome.storage.local.get(ONBOARDED_KEY);
+  if (!hasOnboarded) {
+    showOnboardingView();
+    return;
+  }
+
   setAuthMode("signin");
   await loadAuthDraft();
   const { access_token } = await getTokens();

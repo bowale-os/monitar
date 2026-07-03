@@ -1,13 +1,21 @@
 * { box-sizing: border-box; }
 
+html, body {
+  width: 380px;
+  height: 580px;
+}
+
 body {
-  width: 340px;
   margin: 0;
   padding: 14px;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   font-size: 14px;
   color: #1a1a1a;
   background: #fafafa;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 header {
@@ -112,6 +120,15 @@ button:disabled { opacity: .6; cursor: default; }
   padding: 0;
 }
 
+#main-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+#main-view.hidden { display: none; }
+
 #session-list { list-style: none; margin: 0; padding: 0; }
 
 .session {
@@ -185,3 +202,43 @@ button:disabled { opacity: .6; cursor: default; }
 }
 .status.error { background: #fde8e8; color: #b91c1c; }
 .status.success { background: #e7f6ec; color: #166534; }
+
+/* --- onboarding --- */
+.ob-h1 { font-size: 16px; line-height: 1.3; margin: 0 0 10px; text-transform: none; letter-spacing: normal; color: #1a1a1a; }
+.ob-lead { color: #1a1a1a; }
+.ob-list { margin: 0 0 10px; padding-left: 18px; }
+.ob-list li { margin-bottom: 8px; line-height: 1.45; font-size: 13px; }
+.ob-callout {
+  background: #ecf2ff;
+  color: #1d4ed8;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+.ob-perm-list { margin: 0; padding-left: 18px; }
+.ob-perm-list li { margin-bottom: 6px; line-height: 1.45; font-size: 13px; color: #333; }
+
+#onboarding-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+#onboarding-view.hidden { display: none; }
+
+.ob-step { overflow-y: auto; }
+
+.ob-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.ob-dots { display: flex; gap: 6px; }
+.ob-dot { width: 7px; height: 7px; border-radius: 50%; background: #d4d4d4; }
+.ob-dot.active { background: #2563eb; }
+.ob-nav { display: flex; align-items: center; gap: 12px; }
+#ob-next-btn { padding: 8px 16px; background: #2563eb; color: #fff; font-weight: 600; }
+#ob-next-btn:hover { background: #1d4ed8; }
