@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800" role="img" aria-label="Monitar demo preview">
+  <rect width="1280" height="800" fill="#faf6ec"/>
+
+  <!-- faded "lost tabs" chips -->
+  <g opacity="0.55">
+    <rect x="120" y="110" width="120" height="84" rx="14" fill="#fffdf6" stroke="#e8e0cc"/>
+    <rect x="260" y="110" width="120" height="84" rx="14" fill="#fffdf6" stroke="#e8e0cc"/>
+    <rect x="400" y="110" width="120" height="84" rx="14" fill="#fffdf6" stroke="#e8e0cc"/>
+    <rect x="540" y="110" width="120" height="84" rx="14" fill="#fffdf6" stroke="#e8e0cc"/>
+    <rect x="680" y="110" width="120" height="84" rx="14" fill="#fffdf6" stroke="#e8e0cc"/>
+    <line x1="278" y1="128" x2="362" y2="176" stroke="#c4453a" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+    <line x1="558" y1="128" x2="642" y2="176" stroke="#c4453a" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+  </g>
+
+  <!-- search bar with recall -->
+  <g>
+    <rect x="120" y="290" width="700" height="72" rx="18" fill="#fffdf6" stroke="#0f7d72" stroke-width="2.5"/>
+    <circle cx="164" cy="326" r="13" fill="none" stroke="#0f7d72" stroke-width="4"/>
+    <line x1="174" y1="336" x2="186" y2="348" stroke="#0f7d72" stroke-width="4" stroke-linecap="round"/>
+    <text x="212" y="335" font-family="system-ui, Segoe UI, Roboto, sans-serif" font-size="26" fill="#262218">apartment hunting budget</text>
+  </g>
+
+  <!-- surfaced session card -->
+  <g>
+    <rect x="120" y="394" width="700" height="96" rx="18" fill="#fffdf6" stroke="#e8e0cc"/>
+    <text x="152" y="436" font-family="system-ui, Segoe UI, Roboto, sans-serif" font-size="25" font-weight="600" fill="#262218">Apartment hunting — budget</text>
+    <text x="152" y="468" font-family="system-ui, Segoe UI, Roboto, sans-serif" font-size="19" fill="#71695a">14 tabs · Jun 12</text>
+    <rect x="656" y="418" width="132" height="48" rx="12" fill="#0f7d72"/>
+    <text x="722" y="449" font-family="system-ui, Segoe UI, Roboto, sans-serif" font-size="21" font-weight="600" fill="#ffffff" text-anchor="middle">Restore</text>
+  </g>
+
+  <!-- tagline -->
+  <text x="120" y="620" font-family="system-ui, Segoe UI, Roboto, sans-serif" font-size="52" font-weight="700" fill="#262218">Lose it. Search it. Get it back.</text>
+  <text x="120" y="672" font-family="system-ui, Segoe UI, Roboto, sans-serif" font-size="26" fill="#71695a">Monitar — pick up where you left off.</text>
+</svg>

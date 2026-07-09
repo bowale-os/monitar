@@ -15,7 +15,7 @@ function getWorker() {
       if (data.message === "ready") {
         modelStatus.classList.add("hidden");
       } else {
-        modelStatus.textContent = "Preparing smart search for first use…";
+        modelStatus.textContent = "Setting up search — a few seconds, one time only…";
         modelStatus.classList.remove("hidden");
       }
       return;
@@ -37,22 +37,23 @@ function embed(text) {
   });
 }
 
-function buildEmbedText(payload) {
-  const JUNK = new Set(["new tab", "loading...", "404 not found", "untitled", "about:blank"]);
+const JUNK_TITLES = new Set(["new tab", "loading...", "404 not found", "untitled", "about:blank"]);
 
+function hostnameOf(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return null; }
+}
+
+function buildEmbedText(payload) {
   const allTabs = Object.values(payload.windows ?? {}).flatMap(w => w.tabs ?? []);
 
   const groupNames = Object.values(payload.windows ?? {})
     .flatMap(w => Object.values(w.groups ?? {}).map(g => g.title).filter(Boolean));
 
-  const domains = [...new Set(
-    allTabs.map(t => { try { return new URL(t.url).hostname.replace(/^www\./, ""); } catch { return null; } })
-      .filter(Boolean)
-  )];
+  const domains = [...new Set(allTabs.map(t => hostnameOf(t.url)).filter(Boolean))];
 
   const titles = allTabs
     .map(t => (t.title || "").trim())
-    .filter(t => t && !JUNK.has(t.toLowerCase()));
+    .filter(t => t && !JUNK_TITLES.has(t.toLowerCase()));
 
   const parts = [
     `Intent: ${payload.intent || "Untitled"}.`,
@@ -65,11 +66,8 @@ function buildEmbedText(payload) {
 }
 
 // --- element refs ---
-const onboardingView = document.getElementById("onboarding-view");
-const obSteps = [...document.querySelectorAll(".ob-step")];
-const obDots = [...document.querySelectorAll(".ob-dot")];
-const obBackBtn = document.getElementById("ob-back-btn");
-const obNextBtn = document.getElementById("ob-next-btn");
+const setupNudge = document.getElementById("setup-nudge");
+const nudgeBtn = document.getElementById("nudge-btn");
 
 const authView = document.getElementById("auth-view");
 const mainView = document.getElementById("main-view");
@@ -91,9 +89,21 @@ const activePanel = document.getElementById("active-panel");
 const activeIntent = document.getElementById("active-intent");
 const activeMeta = document.getElementById("active-meta");
 const stopBtn = document.getElementById("stop-btn");
+const newSessionBtn = document.getElementById("new-session-btn");
+const conflictPrompt = document.getElementById("conflict-prompt");
+const conflictText = document.getElementById("conflict-text");
+const conflictSave = document.getElementById("conflict-save");
+const conflictDiscard = document.getElementById("conflict-discard");
+const conflictCancel = document.getElementById("conflict-cancel");
 const sessionList = document.getElementById("session-list");
+const recentList = document.getElementById("recent-list");
+const seeAllBtn = document.getElementById("see-all-btn");
 const emptyState = document.getElementById("empty-state");
-const sessionsSection = document.getElementById("sessions-section");
+
+const historyBtn = document.getElementById("history-btn");
+const historyBackBtn = document.getElementById("history-back-btn");
+const homeScreen = document.getElementById("home-screen");
+const historyScreen = document.getElementById("history-screen");
 
 const searchInput = document.getElementById("search-input");
 const searchSpinner = document.getElementById("search-spinner");
@@ -106,14 +116,46 @@ const statusEl = document.getElementById("status");
 let authMode = "signin"; // "signin" | "signup"
 
 // --- helpers ---
+let _statusTimer = null;
+
 function showStatus(message, kind = "error") {
+  clearTimeout(_statusTimer);
   statusEl.textContent = message;
   statusEl.className = `status ${kind}`;
   statusEl.classList.remove("hidden");
+  if (kind === "success") {
+    _statusTimer = setTimeout(clearStatus, 5000);
+  }
 }
 
 function clearStatus() {
+  clearTimeout(_statusTimer);
   statusEl.classList.add("hidden");
+}
+
+// Like showStatus, but with an inline "Undo" action that runs onUndo and
+// dismisses itself. Auto-dismisses after durationMs either way.
+function showUndoToast(message, onUndo, durationMs = 9000) {
+  clearTimeout(_statusTimer);
+  statusEl.textContent = "";
+  statusEl.className = "status success undo-toast";
+  statusEl.classList.remove("hidden");
+
+  const text = document.createElement("span");
+  text.textContent = message;
+
+  const undoBtn = document.createElement("button");
+  undoBtn.type = "button";
+  undoBtn.className = "undo-btn";
+  undoBtn.textContent = "Undo";
+  undoBtn.addEventListener("click", () => {
+    clearTimeout(_statusTimer);
+    clearStatus();
+    onUndo();
+  });
+
+  statusEl.append(text, undoBtn);
+  _statusTimer = setTimeout(clearStatus, durationMs);
 }
 
 // Central error handling: if the session expired (refresh failed), drop back to
@@ -128,18 +170,42 @@ function handleError(err) {
   }
 }
 
-function formatDate(iso) {
-  if (!iso) return "";                        // ← add this
-  const normalized = iso.replace("+00:00", "Z");
-  const d = new Date(normalized);
-  if (isNaN(d)) return "";
-  return d.toLocaleString(undefined, {
+function parseDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso.replace("+00:00", "Z"));
+  return isNaN(d) ? null : d;
+}
+
+function formatTime(d) {
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+// Relative, scannable dates for session cards: "Today 2:14 PM", "Yesterday",
+// "3 days ago", then "Jun 12" (with the year once it's not this year).
+function formatRelativeDate(iso) {
+  const d = parseDate(iso);
+  if (!d) return "";
+
+  const now = new Date();
+  const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+
+  if (dayDiff <= 0) return `Today ${formatTime(d)}`;
+  if (dayDiff === 1) return "Yesterday";
+  if (dayDiff < 7) return `${dayDiff} days ago`;
+  return d.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
+    ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
   });
+}
+
+// For the active-session card: "since 2:14 PM" today, otherwise the date too.
+function formatSince(iso) {
+  const d = parseDate(iso);
+  if (!d) return "";
+  const rel = formatRelativeDate(iso);
+  return rel.startsWith("Today ") ? rel.slice(6) : rel;
 }
 
 // The popup is destroyed every time it closes, so typed text is lost. Persist
@@ -190,12 +256,14 @@ function getStatus() {
 // Toggle between the "start" form and the "active session" panel.
 async function refreshSessionUI() {
   const status = await getStatus();
+  // Stale prompt with no decision pending (e.g. after a refresh) — drop it.
+  if (!pendingStart) conflictPrompt.classList.add("hidden");
   if (status?.active) {
     startForm.classList.add("hidden");
     activePanel.classList.remove("hidden");
     activeIntent.textContent = status.intent || "Untitled session";
     activeMeta.textContent =
-      `Tracking · ${status.tabCount} tab${status.tabCount === 1 ? "" : "s"} · since ${formatDate(status.started_at)}`;
+      `Tracking · ${status.tabCount} tab${status.tabCount === 1 ? "" : "s"} · since ${formatSince(status.started_at)}`;
       if (status.lastFlushAt) {
         const secondsSinceFlush = (Date.now() - new Date(status.lastFlushAt)) / 1000;
         if (secondsSinceFlush > 300) {
@@ -222,57 +290,62 @@ async function refreshSessionUI() {
 }
 
 // --- onboarding ---
+// Full onboarding lives in onboarding.html (opened in a tab on install). The
+// popup only shows a nudge to finish it until the flag is set.
 const ONBOARDED_KEY = "has_onboarded";
-let obIndex = 0;
 
-function showOnboardingStep(index) {
-  obSteps.forEach((step, i) => step.classList.toggle("hidden", i !== index));
-  obDots.forEach((dot, i) => dot.classList.toggle("active", i === index));
-  obBackBtn.classList.toggle("hidden", index === 0);
-  obNextBtn.textContent = index === obSteps.length - 1 ? "Start my first session" : "Next";
-  obIndex = index;
-}
-
-function showOnboardingView() {
-  onboardingView.classList.remove("hidden");
+function showSetupNudge() {
+  setupNudge.classList.remove("hidden");
   authView.classList.add("hidden");
   mainView.classList.add("hidden");
   signoutBtn.classList.add("hidden");
-  showOnboardingStep(0);
+  historyBtn.classList.add("hidden");
 }
 
-async function finishOnboarding() {
-  await chrome.storage.local.set({ [ONBOARDED_KEY]: true });
-  onboardingView.classList.add("hidden");
-  showAuthView();
-}
-
-obBackBtn.addEventListener("click", () => {
-  if (obIndex > 0) showOnboardingStep(obIndex - 1);
-});
-obNextBtn.addEventListener("click", () => {
-  if (obIndex < obSteps.length - 1) {
-    showOnboardingStep(obIndex + 1);
+nudgeBtn.addEventListener("click", async () => {
+  const onboardingUrl = chrome.runtime.getURL("onboarding.html");
+  const [existing] = await chrome.tabs.query({ url: onboardingUrl });
+  if (existing) {
+    await chrome.tabs.update(existing.id, { active: true });
+    await chrome.windows.update(existing.windowId, { focused: true });
   } else {
-    finishOnboarding();
+    await chrome.tabs.create({ url: onboardingUrl });
   }
+  window.close();
 });
 
 // --- views ---
 function showAuthView() {
-  onboardingView.classList.add("hidden");
+  setupNudge.classList.add("hidden");
   authView.classList.remove("hidden");
   mainView.classList.add("hidden");
   signoutBtn.classList.add("hidden");
+  historyBtn.classList.add("hidden");
 }
 
 function showMainView() {
+  setupNudge.classList.add("hidden");
   authView.classList.add("hidden");
   mainView.classList.remove("hidden");
   signoutBtn.classList.remove("hidden");
+  showHomeScreen();
   // Start the worker now so the model downloads in the background while the
   // user looks at their sessions — by first search it should already be ready.
   getWorker();
+}
+
+// --- home / history screens (both live inside main-view) ---
+function showHomeScreen() {
+  homeScreen.classList.remove("hidden");
+  historyScreen.classList.add("hidden");
+  historyBtn.classList.remove("hidden");
+  resetSearch();
+}
+
+function showHistoryScreen() {
+  homeScreen.classList.add("hidden");
+  historyScreen.classList.remove("hidden");
+  historyBtn.classList.add("hidden");
 }
 
 function setAuthMode(mode) {
@@ -285,44 +358,193 @@ function setAuthMode(mode) {
   clearStatus();
 }
 
+const TRASH_ICON =
+  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>' +
+  '<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>' +
+  '<line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+
+const CHEVRON_ICON =
+  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<polyline points="9 6 15 12 9 18"/></svg>';
+
+const RECENT_COUNT = 3;
+
+// Decrypted session payloads, cached per session id so re-expanding a preview
+// doesn't re-decrypt. Value is the decrypted payload, or an Error if decrypt
+// failed (also cached, so we don't retry a session that has no key / no
+// content on every expand).
+const _previewCache = new Map();
+
+async function getDecryptedPayload(s) {
+  if (_previewCache.has(s._id)) {
+    const cached = _previewCache.get(s._id);
+    if (cached instanceof Error) throw cached;
+    return cached;
+  }
+  try {
+    if (!s.content_encrypted) throw new Error("no-content");
+    const key = await loadKey();
+    if (!key) throw new Error("no-key");
+    const payload = await decrypt(key, s.content_encrypted);
+    _previewCache.set(s._id, payload);
+    return payload;
+  } catch (err) {
+    _previewCache.set(s._id, err);
+    throw err;
+  }
+}
+
+function renderPreview(panel, payload) {
+  panel.innerHTML = "";
+
+  const windows = Object.values(payload.windows ?? {});
+  const allTabs = windows.flatMap(w => w.tabs ?? []);
+
+  if (allTabs.length === 0) {
+    panel.innerHTML = '<p class="preview-empty muted">This session has no restorable tabs.</p>';
+    return;
+  }
+
+  const windowCount = windows.length;
+  const summary = document.createElement("p");
+  summary.className = "preview-summary muted";
+  summary.textContent =
+    `${windowCount} window${windowCount === 1 ? "" : "s"} · restoring opens ${allTabs.length} tab${allTabs.length === 1 ? "" : "s"} in a new window`;
+  panel.append(summary);
+
+  const groups = windows.flatMap(w => Object.values(w.groups ?? {})).filter(g => g.title);
+  if (groups.length) {
+    const groupsRow = document.createElement("div");
+    groupsRow.className = "preview-groups";
+    for (const g of groups) {
+      const chip = document.createElement("span");
+      chip.className = `group-chip group-${g.color || "grey"}`;
+      chip.textContent = g.title;
+      groupsRow.append(chip);
+    }
+    panel.append(groupsRow);
+  }
+
+  const sampleTabs = allTabs
+    .filter(t => (t.title || "").trim() && !JUNK_TITLES.has(t.title.trim().toLowerCase()))
+    .slice(0, 3);
+
+  if (sampleTabs.length) {
+    const tabsList = document.createElement("ul");
+    tabsList.className = "preview-tabs";
+    for (const t of sampleTabs) {
+      const row = document.createElement("li");
+      const tTitle = document.createElement("span");
+      tTitle.className = "preview-tab-title";
+      tTitle.textContent = t.title;
+      const tHost = document.createElement("span");
+      tHost.className = "preview-tab-host muted";
+      tHost.textContent = hostnameOf(t.url) || "";
+      row.append(tTitle, tHost);
+      tabsList.append(row);
+    }
+    panel.append(tabsList);
+  }
+}
+
+const PREVIEW_ERROR_MESSAGES = {
+  "no-content": "This session has no restorable content.",
+  "no-key": "You need to sign in again to preview or restore sessions.",
+};
+
+async function togglePreview(s, panel, expandBtn) {
+  const isOpen = !panel.classList.contains("hidden");
+  if (isOpen) {
+    panel.classList.add("hidden");
+    expandBtn.setAttribute("aria-expanded", "false");
+    expandBtn.classList.remove("expanded");
+    return;
+  }
+
+  panel.classList.remove("hidden");
+  expandBtn.setAttribute("aria-expanded", "true");
+  expandBtn.classList.add("expanded");
+
+  if (panel.dataset.rendered) return;
+  panel.innerHTML = '<p class="preview-loading muted">Loading preview…</p>';
+
+  try {
+    const payload = await getDecryptedPayload(s);
+    renderPreview(panel, payload);
+  } catch (err) {
+    panel.innerHTML = `<p class="preview-empty muted">${PREVIEW_ERROR_MESSAGES[err.message] || "Couldn't load a preview for this session."}</p>`;
+  }
+  panel.dataset.rendered = "1";
+}
+
+function buildSessionRow(s, { showDelete }) {
+  const count = s.tab_count ?? 0;
+
+  const li = document.createElement("li");
+  li.className = "session";
+
+  const row = document.createElement("div");
+  row.className = "session-row";
+
+  const expandBtn = document.createElement("button");
+  expandBtn.type = "button";
+  expandBtn.className = "expand-btn";
+  expandBtn.innerHTML = CHEVRON_ICON;
+  expandBtn.title = "Preview session";
+  expandBtn.setAttribute("aria-label", "Preview session");
+  expandBtn.setAttribute("aria-expanded", "false");
+
+  const info = document.createElement("div");
+  info.className = "session-info";
+  const title = document.createElement("div");
+  title.className = "session-title";
+  title.textContent = s.intent || "Untitled session";
+  const meta = document.createElement("div");
+  meta.className = "session-meta";
+  meta.textContent = `${count} tab${count === 1 ? "" : "s"} · ${formatRelativeDate(s.started_at)}`;
+  info.append(title, meta);
+
+  const actions = document.createElement("div");
+  actions.className = "session-actions";
+
+  const restoreBtn = document.createElement("button");
+  restoreBtn.className = "restore-btn";
+  restoreBtn.textContent = "Restore";
+  restoreBtn.addEventListener("click", () => restoreSession(s._id, restoreBtn));
+  actions.append(restoreBtn);
+
+  if (showDelete) {
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "trash-btn";
+    deleteBtn.innerHTML = TRASH_ICON;
+    deleteBtn.title = "Delete session";
+    deleteBtn.setAttribute("aria-label", "Delete session");
+    deleteBtn.addEventListener("click", () => deleteSession(s._id, deleteBtn));
+    actions.append(deleteBtn);
+  }
+
+  row.append(expandBtn, info, actions);
+
+  const preview = document.createElement("div");
+  preview.className = "session-preview hidden";
+  expandBtn.addEventListener("click", () => togglePreview(s, preview, expandBtn));
+
+  li.append(row, preview);
+  return li;
+}
+
+// Renders the full list (History screen) and the recent slice (Home screen)
+// from the same fetched array, so there's only ever one API call.
 function renderSessions(sessions) {
   sessionList.innerHTML = "";
+  for (const s of sessions) sessionList.append(buildSessionRow(s, { showDelete: true }));
+
+  recentList.innerHTML = "";
+  for (const s of sessions.slice(0, RECENT_COUNT)) recentList.append(buildSessionRow(s, { showDelete: true }));
+
   emptyState.classList.toggle("hidden", sessions.length > 0);
-
-  for (const s of sessions) {
-    const count = s.tab_count ?? 0;
-
-    const li = document.createElement("li");
-    li.className = "session";
-
-    const info = document.createElement("div");
-    info.className = "session-info";
-    const title = document.createElement("div");
-    title.className = "session-title";
-    title.textContent = s.intent || "Untitled session";
-    const meta = document.createElement("div");
-    meta.className = "session-meta";
-    meta.textContent = `${count} tab${count === 1 ? "" : "s"} · ${formatDate(s.started_at)}`;
-    info.append(title, meta);
-
-    const actions = document.createElement("div");
-    actions.className = "session-actions";
-
-    const restoreBtn = document.createElement("button");
-    restoreBtn.className = "restore-btn";
-    restoreBtn.textContent = "Restore";
-    restoreBtn.addEventListener("click", () => restoreSession(s._id, restoreBtn));
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.className = "delete-btn";
-    deleteBtn.textContent = "Delete";
-    deleteBtn.title = "Delete session";
-    deleteBtn.addEventListener("click", () => deleteSession(s._id, deleteBtn));
-
-    actions.append(restoreBtn, deleteBtn);
-    li.append(info, actions);
-    sessionList.append(li);
-  }
+  seeAllBtn.classList.toggle("hidden", sessions.length <= RECENT_COUNT);
 }
 
 // --- actions ---
@@ -358,6 +580,8 @@ async function restoreSession(id, btn) {
       return;
     }
 
+    const createdWindowIds = [];
+
     for (const [, windowData] of Object.entries(payload.windows)) {
       const urls = windowData.tabs.map(t => t.url).filter(Boolean);
       if (urls.length === 0) continue;
@@ -365,6 +589,7 @@ async function restoreSession(id, btn) {
       // create window with first tab
       const newWindow = await chrome.windows.create({ url: urls[0] });
       const newWindowId = newWindow.id;
+      createdWindowIds.push(newWindowId);
 
       // create remaining tabs in same window
       const newTabs = [newWindow.tabs[0]];
@@ -404,8 +629,18 @@ async function restoreSession(id, btn) {
           color: groupMeta.color,
         });
       }
+    }
 
-      
+    if (createdWindowIds.length > 0) {
+      showUndoToast(
+        `Restored ${createdWindowIds.length} window${createdWindowIds.length === 1 ? "" : "s"}.`,
+        () => {
+          // Undo just closes whatever's left in the windows restore opened. If
+          // the user already closed or navigated a restored tab, there's
+          // nothing to reconcile — we simply remove what remains.
+          for (const wid of createdWindowIds) chrome.windows.remove(wid).catch(() => {});
+        }
+      );
     }
   } catch (err) {
     handleError(err);
@@ -419,6 +654,9 @@ async function deleteSession(id, btn) {
   btn.disabled = true;
   try {
     await api.deleteSession(id);
+    // Deleting from search results doesn't get picked up by loadSessions
+    // (it only rebuilds session-list/recent-list), so drop the row directly too.
+    btn.closest("li.session")?.remove();
     await loadSessions();
   } catch (err) {
     handleError(err);
@@ -429,16 +667,27 @@ async function deleteSession(id, btn) {
 async function handleStart(e) {
   e.preventDefault();
   clearStatus();
+  const intent = intentInput.value.trim();
+  if (!intent) {
+    showStatus("Describe what you're working on to start a session.");
+    return;
+  }
   startBtn.disabled = true;
   try {
     const captureExisting = includeOpen.checked;
     // Remember this choice for the next session.
     await chrome.storage.local.set({ capture_existing_pref: captureExisting });
-    await chrome.runtime.sendMessage({
+    const res = await chrome.runtime.sendMessage({
       type: "START_SESSION",
-      intent: intentInput.value.trim(),
+      intent,
       captureExisting,
     });
+    if (res?.code === "SESSION_ACTIVE") {
+      // A session is still running — the user decides its fate before the
+      // new one starts. Keep the typed intent around until they do.
+      showConflictPrompt(res.intent, { intent, captureExisting });
+      return;
+    }
     intentInput.value = "";
     clearIntentDraft();
     await refreshSessionUI();
@@ -449,25 +698,78 @@ async function handleStart(e) {
   }
 }
 
+// --- session conflict (start requested while another session is running) ---
+// The background worker refuses to overwrite a running session; it hands back
+// SESSION_ACTIVE and we ask the user to save or discard the old one first.
+let pendingStart = null; // { intent, captureExisting } waiting on the choice
+
+function showConflictPrompt(runningIntent, pending) {
+  pendingStart = pending;
+  conflictText.textContent =
+    `"${runningIntent || "Untitled session"}" is still running. Save it or discard it before starting the new session?`;
+  conflictPrompt.classList.remove("hidden");
+}
+
+function hideConflictPrompt() {
+  pendingStart = null;
+  conflictPrompt.classList.add("hidden");
+}
+
+async function resolveConflict(onConflict) {
+  if (!pendingStart) return;
+  const pending = pendingStart;
+  conflictSave.disabled = conflictDiscard.disabled = true;
+  try {
+    let vector = null;
+    if (onConflict === "save") {
+      showStatus("Saving previous session...", "success");
+      vector = await computeSessionVector();
+    }
+    const res = await chrome.runtime.sendMessage({
+      type: "START_SESSION",
+      ...pending,
+      onConflict,
+      vector,
+    });
+    if (!res?.ok) throw new Error("Couldn't start the new session. Please try again.");
+    hideConflictPrompt();
+    intentInput.value = "";
+    clearIntentDraft();
+    showStatus(
+      onConflict === "save"
+        ? "Previous session saved. New session started."
+        : "Previous session discarded. New session started.",
+      "success"
+    );
+    await refreshSessionUI();
+    await loadSessions();
+  } catch (err) {
+    showStatus(err.message);
+  } finally {
+    conflictSave.disabled = conflictDiscard.disabled = false;
+  }
+}
+
+// Embed the running session's content so it's searchable once saved.
+// Returns null when there's nothing to embed or embedding fails (non-fatal).
+async function computeSessionVector() {
+  const { payload } = await chrome.runtime.sendMessage({ type: "GET_SESSION_DATA" });
+  if (!payload) return null;
+  try {
+    const embedText = buildEmbedText(payload);
+    return await embed(embedText);
+  } catch (_) {
+    return null;
+  }
+}
+
 async function handleStop() {
   clearStatus();
   stopBtn.disabled = true;
-  let vector = null;
   try {
-    // 1. get data BEFORE stopping
-    const { payload } = await chrome.runtime.sendMessage({ type: "GET_SESSION_DATA" });
-    if (payload) {
-      try {
-        showStatus("Saving session...", "success");
-        const embedText = buildEmbedText(payload);
-        console.log("embed text:", embedText);
-        vector = await embed(embedText);
-        console.log("vector length:", vector?.length, "first value:", vector?.[0]);
-      } catch (_) {
-        // embedding failure is non-fatal
-      }
-    }
-    // 2. stop with vector
+    // Compute the embedding BEFORE stopping, then stop with it.
+    showStatus("Saving session...", "success");
+    const vector = await computeSessionVector();
     await chrome.runtime.sendMessage({ type: "STOP_SESSION", vector });
     showStatus("Session saved.", "success");
     await refreshSessionUI();
@@ -518,13 +820,20 @@ async function handleSignout() {
     await chrome.runtime.sendMessage({ type: "ABORT_SESSION" });
   } catch (_) {}
   await clearKey();
+  // Wipe all local state, but keep the onboarding flag — signing out must not
+  // re-onboard a returning user.
+  const { [ONBOARDED_KEY]: hasOnboarded } = await chrome.storage.local.get(ONBOARDED_KEY);
   await chrome.storage.local.clear();
+  if (hasOnboarded) await chrome.storage.local.set({ [ONBOARDED_KEY]: true });
   // Clear the visible fields and the rendered session list so the next person
   // doesn't see the previous user's data (it stays safe in their account).
   authForm.reset();
   intentInput.value = "";
   sessionList.innerHTML = "";
+  recentList.innerHTML = "";
+  seeAllBtn.classList.add("hidden");
   emptyState.classList.add("hidden");
+  resetSearch();
   clearStatus();
   setAuthMode("signin");
   showAuthView();
@@ -532,14 +841,19 @@ async function handleSignout() {
 
 // --- search ---
 function showSessionsSection() {
-  sessionsSection.classList.remove("hidden");
+  sessionList.classList.remove("hidden");
   searchResults.classList.add("hidden");
   searchResults.innerHTML = "";
   noResults.classList.add("hidden");
 }
 
 function showSearchSection() {
-  sessionsSection.classList.add("hidden");
+  sessionList.classList.add("hidden");
+}
+
+function resetSearch() {
+  searchInput.value = "";
+  showSessionsSection();
 }
 
 function renderSearchResults(sessions) {
@@ -553,32 +867,7 @@ function renderSearchResults(sessions) {
   }
 
   searchResults.classList.remove("hidden");
-  for (const s of sessions) {
-    const count = s.tab_count ?? 0;
-    const li = document.createElement("li");
-    li.className = "session";
-
-    const info = document.createElement("div");
-    info.className = "session-info";
-    const title = document.createElement("div");
-    title.className = "session-title";
-    title.textContent = s.intent || "Untitled session";
-    const meta = document.createElement("div");
-    meta.className = "session-meta";
-    meta.textContent = `${count} tab${count === 1 ? "" : "s"} · ${formatDate(s.started_at)}`;
-    info.append(title, meta);
-
-    const actions = document.createElement("div");
-    actions.className = "session-actions";
-    const restoreBtn = document.createElement("button");
-    restoreBtn.className = "restore-btn";
-    restoreBtn.textContent = "Restore";
-    restoreBtn.addEventListener("click", () => restoreSession(s._id, restoreBtn));
-    actions.append(restoreBtn);
-
-    li.append(info, actions);
-    searchResults.append(li);
-  }
+  for (const s of sessions) searchResults.append(buildSessionRow(s, { showDelete: true }));
 }
 
 let _searchDebounce = null;
@@ -609,7 +898,22 @@ tabSignup.addEventListener("click", () => setAuthMode("signup"));
 authForm.addEventListener("submit", handleAuth);
 startForm.addEventListener("submit", handleStart);
 stopBtn.addEventListener("click", handleStop);
+// While a session runs the start form is hidden; "New session" reveals it so
+// submitting can trigger the save/discard conflict flow.
+newSessionBtn.addEventListener("click", () => {
+  startForm.classList.remove("hidden");
+  intentInput.focus();
+});
+conflictSave.addEventListener("click", () => resolveConflict("save"));
+conflictDiscard.addEventListener("click", () => resolveConflict("discard"));
+conflictCancel.addEventListener("click", () => {
+  hideConflictPrompt();
+  startForm.classList.add("hidden"); // back to just the active card
+});
 signoutBtn.addEventListener("click", handleSignout);
+historyBtn.addEventListener("click", showHistoryScreen);
+historyBackBtn.addEventListener("click", showHomeScreen);
+seeAllBtn.addEventListener("click", showHistoryScreen);
 
 
 searchInput.addEventListener("input", () => {
@@ -638,27 +942,26 @@ window.addEventListener("focus", async () => {   // ← add this
 
 // --- init ---
 (async function init() {
-  const { [ONBOARDED_KEY]: hasOnboarded } = await chrome.storage.local.get(ONBOARDED_KEY);
-  if (!hasOnboarded) {
-    showOnboardingView();
-    return;
-  }
-
   setAuthMode("signin");
   await loadAuthDraft();
   const { access_token } = await getTokens();
   if (access_token) {
-    
-    const key = await loadKey();        // ← add this
-    if (!key) {                         // ← and this
-      showAuthView();                   // key gone, need password again
+    const key = await loadKey();
+    if (key) {
+      // Signed in and able to decrypt — go straight to sessions, even if the
+      // onboarding tab was closed early.
+      showMainView();
+      await refreshSessionUI();
+      await loadSessions();
       return;
     }
+    // key gone, need the password again — fall through to auth/nudge
+  }
 
-    showMainView();
-    await refreshSessionUI();
-    await loadSessions();
-  } else {
+  const { [ONBOARDED_KEY]: hasOnboarded } = await chrome.storage.local.get(ONBOARDED_KEY);
+  if (hasOnboarded) {
     showAuthView();
+  } else {
+    showSetupNudge();
   }
 })();

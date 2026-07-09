@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Welcome to Monitar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;700&family=Nunito:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="onboarding.css" />
+</head>
+<body>
+  <header class="ob-header">
+    <div class="brand">
+      <span class="brand-name swash">Monitar</span>
+    </div>
+    <button id="skip-btn" class="link">I'll explore on my own</button>
+  </header>
+
+  <main class="ob-main">
+    <div class="confetti" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+
+    <!-- Step 1 — Hook -->
+    <section class="step hidden" id="step-hook">
+      <div class="step-header">
+        <h1>Never lose your train of <span class="swash">search</span> again.</h1>
+        <p class="lead">
+          Take a break. Pick up right where you left off.
+        </p>
+      </div>
+      <div class="step-body">
+        <figure class="video-wrap">
+          <video id="demo-video" autoplay muted loop playsinline
+                 poster="media/demo-poster.svg">
+            <source id="demo-source" src="media/demo.webm" type="video/webm" />
+          </video>
+        </figure>
+      </div>
+      <div class="step-actions">
+        <button class="primary" id="hook-next">Get started<svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- Step 2 — Privacy -->
+    <section class="step hidden" id="step-privacy">
+      <div class="step-header">
+        <h1>Monitar is designed for <span class="swash">privacy</span></h1>
+        <p class="lead">
+          Here's exactly how, in plain English.
+        </p>
+      </div>
+      <div class="step-body">
+        <ul class="privacy-list">
+          <li>
+            <svg class="privacy-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+            <span><strong>Your data is encrypted.</strong>
+                Monitar scrambles your data with some mighty computer algorithm (the AES-256), so it will always be secure.</span>
+          </li>
+          <li>
+            <svg class="privacy-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+              <path d="M9.5 12l1.8 1.8L15 10" />
+            </svg>
+            <span><strong>Tracking only when you say so.</strong>
+            Monitar only peeks at your tabs if you let it. Your right to privacy is too important.</span>
+          </li>
+          <li>
+            <svg class="privacy-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <line x1="5.5" y1="5.5" x2="18.5" y2="18.5" />
+            </svg>
+            <span><strong>No ads, ever.</strong>
+            Monitar never tracks you or uses your data for ads.</span>
+          </li>
+        </ul>
+      </div>
+      <div class="step-actions">
+        <button class="primary" id="privacy-next">Continue<svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- Step 3 — Account -->
+    <section class="step hidden" id="step-account">
+      <div class="step-header">
+        <h1>One account. <span class="swash">Zero</span> readable data.</h1>
+        <p class="lead">
+          Your account only syncs encrypted sessions across your devices. Your
+          password doubles as your encryption key. It never leaves your browser.
+        </p>
+      </div>
+      <div class="step-body">
+        <form id="account-form">
+          <input id="name" type="text" placeholder="Name" autocomplete="name" />
+          <input id="email" type="email" placeholder="Email" autocomplete="email" required />
+          <input id="password" type="password" placeholder="Password" autocomplete="new-password" required />
+        </form>
+        <button id="auth-toggle" class="link">Already have an account? Sign in</button>
+        <p class="fine-print">
+          Because we never see your password, we can't recover your sessions if
+          you forget it. Use a password manager.
+        </p>
+        <p id="account-status" class="status hidden"></p>
+      </div>
+      <div class="step-actions">
+        <button type="submit" form="account-form" class="primary" id="account-submit">Create my account<svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- Step 4 — First session -->
+    <section class="step hidden" id="step-session">
+      <div class="step-header">
+        <h1>Save what you're working on <span class="swash">right now</span>.</h1>
+        <p class="lead">
+          Name this session and Monitar starts keeping track. Browse normally,
+          close everything whenever you like. It's all saved.
+        </p>
+      </div>
+      <div class="step-body">
+        <form id="session-form">
+          <input id="intent" type="text" required
+                 placeholder='What are you working on? e.g. "trip planning"' />
+          <label class="checkbox-row">
+            <span class="checkbox">
+              <input type="checkbox" id="include-open" checked />
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 12 9 17 20 6" /></svg>
+            </span>
+            Include the tabs I already have open
+          </label>
+        </form>
+        <p id="session-status" class="status hidden"></p>
+      </div>
+      <div class="step-actions">
+        <button type="submit" form="session-form" class="primary" id="session-submit">Start my first session<svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- Done -->
+    <section class="step hidden" id="step-done">
+      <div class="step-header">
+        <h1>You're <span class="swash">covered</span>.</h1>
+        <p class="lead">
+          Monitar is tracking this session and autosaving as you browse. When you
+          want it back, whenever, just search for what you were
+          doing.
+        </p>
+      </div>
+      <div class="step-body">
+        <div class="tip-card">
+          <svg class="tip-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 17v5" />
+            <path d="M9 10.5V6a3 3 0 0 1 6 0v4.5c1.5.7 2.5 2.2 2.5 4a1 1 0 0 1-1 1H7.5a1 1 0 0 1-1-1c0-1.8 1-3.3 2.5-4z" />
+          </svg>
+          <p>
+            <strong>Pin Monitar:</strong> click the puzzle icon in your toolbar,
+            then the pin next to Monitar so it's always one click away.
+          </p>
+        </div>
+      </div>
+      <div class="step-actions">
+        <button class="primary" id="done-btn">Done</button>
+      </div>
+    </section>
+
+    <!-- Already onboarded — shown instead of the flow when has_onboarded is set -->
+    <section class="step hidden" id="step-blocked">
+      <div class="step-header">
+        <h1>You're already <span class="swash">set up</span>.</h1>
+        <p class="lead">
+          Monitar is ready to go in this browser. Everything lives in the
+          toolbar popup — start, stop, and search your sessions from there.
+        </p>
+      </div>
+      <div class="step-body">
+        <div class="tip-card">
+          <svg class="tip-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 17v5" />
+            <path d="M9 10.5V6a3 3 0 0 1 6 0v4.5c1.5.7 2.5 2.2 2.5 4a1 1 0 0 1-1 1H7.5a1 1 0 0 1-1-1c0-1.8 1-3.3 2.5-4z" />
+          </svg>
+          <p>
+            <strong>Pin Monitar:</strong> click the puzzle icon in your toolbar,
+            then the pin next to Monitar so it's always one click away.
+          </p>
+        </div>
+      </div>
+      <div class="step-actions">
+        <button class="primary" id="blocked-open-btn">Open Monitar</button>
+      </div>
+    </section>
+  </main>
+
+  <button type="button" id="back-btn" class="btn-outline hidden"><svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="20" y1="12" x2="4" y2="12"/><polyline points="11 5 4 12 11 19"/></svg>Back</button>
+
+  <footer class="ob-footer" id="ob-footer">
+    <div class="dots" id="dots">
+      <span class="dot active"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div>
+  </footer>
+
+  <script type="module" src="onboarding.js"></script>
+</body>
+</html>

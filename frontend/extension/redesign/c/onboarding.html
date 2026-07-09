@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Welcome to Monitar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Work+Sans:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="onboarding.css" />
+</head>
+<body>
+  <header class="ob-header">
+    <div class="brand">
+      <img class="brand-icon" src="../../icons/icon_32.png" alt="" />
+      <span class="brand-name">Monitar</span>
+    </div>
+    <button id="theme-toggle" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">
+      <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>
+      <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z"/></svg>
+    </button>
+    <button id="skip-btn" class="link">Skip — I'll explore on my own</button>
+  </header>
+
+  <main class="ob-main">
+    <!-- Step 1 — Hook -->
+    <section class="step" id="step-hook">
+      <h1>Never lose your train of thought again.</h1>
+      <p class="lead">
+        You close 40 tabs at the end of a deep-research night, and by next week
+        you can't remember why half of them mattered. Monitar remembers for
+        you — and brings it all back.
+      </p>
+      <figure class="video-wrap">
+        <video id="demo-video" autoplay muted loop playsinline
+               poster="media/demo-poster.svg">
+          <source id="demo-source" src="media/demo.webm" type="video/webm" />
+        </video>
+        <figcaption>Lose it. Search it. Get it back — in 30 seconds.</figcaption>
+      </figure>
+      <button class="primary" id="hook-next">Get started</button>
+    </section>
+
+    <!-- Step 2 — Privacy -->
+    <section class="step hidden" id="step-privacy">
+      <h1>Private by architecture, not by promise.</h1>
+      <ul class="privacy-list">
+        <li>
+          <svg class="privacy-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          </svg>
+          <span><strong>Encrypted before it leaves your device.</strong>
+          Your sessions are sealed with a key made from your password. Our
+          servers store ciphertext — we can't read your tabs.</span>
+        </li>
+        <li>
+          <svg class="privacy-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+            <circle cx="12" cy="12" r="3" />
+            <line x1="3" y1="21" x2="21" y2="3" />
+          </svg>
+          <span><strong>Search never phones home.</strong>
+          The search model runs inside your browser. Your queries never leave
+          your device.</span>
+        </li>
+        <li>
+          <svg class="privacy-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+            <path d="M9.5 12l1.8 1.8L15 10" />
+          </svg>
+          <span><strong>Tracking only when you say so.</strong>
+          Monitar sees tabs only while a session you started is running. No
+          history access, no page contents.</span>
+        </li>
+      </ul>
+      <button class="primary" id="privacy-next">Continue</button>
+    </section>
+
+    <!-- Step 3 — Account -->
+    <section class="step hidden" id="step-account">
+      <h1>One account. Zero readable data.</h1>
+      <p class="lead">
+        Your account only syncs encrypted sessions across your devices. Your
+        password doubles as your encryption key — it never leaves your browser.
+      </p>
+      <form id="account-form">
+        <input id="name" type="text" placeholder="Name" autocomplete="name" />
+        <input id="email" type="email" placeholder="Email" autocomplete="email" required />
+        <input id="password" type="password" placeholder="Password" autocomplete="new-password" required />
+        <button type="submit" class="primary" id="account-submit">Create my account</button>
+      </form>
+      <button id="auth-toggle" class="link">Already have an account? Sign in</button>
+      <p class="fine-print">
+        Because we never see your password, we can't recover your sessions if
+        you forget it. Use a password manager.
+      </p>
+      <p id="account-status" class="status hidden"></p>
+    </section>
+
+    <!-- Step 4 — First session -->
+    <section class="step hidden" id="step-session">
+      <h1>Save what you're working on right now.</h1>
+      <p class="lead">
+        Name this session and Monitar starts keeping track. Browse normally,
+        close everything whenever you like — it's all saved.
+      </p>
+      <form id="session-form">
+        <input id="intent" type="text"
+               placeholder='What are you working on? — e.g. "trip planning", "thesis sources"' />
+        <label class="checkbox-row">
+          <span class="checkbox">
+            <input type="checkbox" id="include-open" checked />
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 12 9 17 20 6" /></svg>
+          </span>
+          Include the tabs I already have open
+        </label>
+        <button type="submit" class="primary" id="session-submit">Start my first session</button>
+      </form>
+      <p id="session-status" class="status hidden"></p>
+    </section>
+
+    <!-- Done -->
+    <section class="step hidden" id="step-done">
+      <h1>You're covered.</h1>
+      <p class="lead">
+        Monitar is tracking this session and autosaving as you browse. When you
+        want it back — next week or next year — just search for what you were
+        doing.
+      </p>
+      <div class="tip-card">
+        <svg class="tip-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 17v5" />
+          <path d="M9 10.5V6a3 3 0 0 1 6 0v4.5c1.5.7 2.5 2.2 2.5 4a1 1 0 0 1-1 1H7.5a1 1 0 0 1-1-1c0-1.8 1-3.3 2.5-4z" />
+        </svg>
+        <p>
+          <strong>Pin Monitar:</strong> click the puzzle icon in your toolbar,
+          then the pin next to Monitar — so it's always one click away.
+        </p>
+      </div>
+      <button class="primary" id="done-btn">Done</button>
+    </section>
+  </main>
+
+  <footer class="ob-footer" id="ob-footer">
+    <button id="back-btn" class="link hidden">Back</button>
+    <div class="dots" id="dots">
+      <span class="dot active"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div>
+  </footer>
+
+  <script src="../../preview-shim.js"></script>
+  <script>
+    (function () {
+      var KEY = "monitar_theme";
+      var saved = localStorage.getItem(KEY);
+      if (saved === "dark") document.documentElement.setAttribute("data-theme", "dark");
+      document.getElementById("theme-toggle").addEventListener("click", function () {
+        var isDark = document.documentElement.getAttribute("data-theme") === "dark";
+        if (isDark) { document.documentElement.removeAttribute("data-theme"); localStorage.setItem(KEY, "light"); }
+        else { document.documentElement.setAttribute("data-theme", "dark"); localStorage.setItem(KEY, "dark"); }
+      });
+    })();
+  </script>
+  <script type="module" src="../../onboarding.js"></script>
+</body>
+</html>

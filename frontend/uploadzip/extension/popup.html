@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <h1>Monitar</h1>
+    <button id="signout-btn" class="link hidden">Sign out</button>
+  </header>
+
+  <!-- Auth view -->
+  <section id="auth-view" class="hidden">
+    <div class="tabs">
+      <button id="tab-signin" class="tab active">Sign in</button>
+      <button id="tab-signup" class="tab">Sign up</button>
+    </div>
+
+    <form id="auth-form">
+      <input id="name" type="text" placeholder="Name" class="hidden" autocomplete="name" />
+      <input id="email" type="email" placeholder="Email" autocomplete="email" required />
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" required />
+      <button type="submit" id="auth-submit">Sign in</button>
+    </form>
+  </section>
+
+  <!-- Main view -->
+  <section id="main-view" class="hidden">
+    <!-- Idle: start a new session -->
+    <form id="start-form">
+      <input id="intent" type="text" placeholder="What are you working on?" />
+      <label class="checkbox-row">
+        <input type="checkbox" id="include-open" />
+        Also capture tabs already open
+      </label>
+      <button type="submit" id="start-btn">Start session</button>
+    </form>
+
+    <!-- Active: a session is being tracked -->
+    <div id="active-panel" class="hidden">
+      <div class="active-card">
+        <span class="dot"></span>
+        <div class="active-info">
+          <div id="active-intent" class="session-title"></div>
+          <div id="active-meta" class="session-meta"></div>
+        </div>
+      </div>
+      <button id="stop-btn">Stop &amp; save session</button>
+    </div>
+
+    <h2>Saved sessions</h2>
+    <ul id="session-list"></ul>
+    <p id="empty-state" class="muted hidden">No saved sessions yet.</p>
+  </section>
+
+  <p id="status" class="status hidden"></p>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
