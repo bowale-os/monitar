@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Monitar",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Start a session, browse, and Monitar tracks your tabs and saves them to your account.",
   "permissions": ["tabs", "storage", "alarms", "tabGroups"],
   "host_permissions": ["https://monitar.up.railway.app/*"],
