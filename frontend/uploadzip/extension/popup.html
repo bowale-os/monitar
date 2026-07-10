@@ -2,13 +2,43 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="color-scheme" content="light" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;700&family=Nunito:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
+  <div class="confetti" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+
   <header>
-    <h1>Monitar</h1>
-    <button id="signout-btn" class="link hidden">Sign out</button>
+    <div class="brand">
+      <h1 class="swash">Monitar</h1>
+    </div>
+    <div class="header-actions">
+      <button id="history-btn" class="icon-btn hidden" title="Session history" aria-label="Session history">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+          <path d="M12 7v5l4 2" />
+        </svg>
+      </button>
+      <button id="signout-btn" class="link hidden">Sign out</button>
+    </div>
   </header>
+
+  <!-- Setup nudge (shown until the onboarding tab is finished or skipped) -->
+  <section id="setup-nudge" class="hidden">
+    <div class="nudge-card">
+      <svg class="nudge-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 11l3 3L22 4" />
+        <path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11" />
+      </svg>
+      <h2 class="nudge-title">Finish setting up Monitar</h2>
+      <p class="nudge-body">Takes about a minute, then your sessions save themselves.</p>
+      <button id="nudge-btn">Finish setup</button>
+    </div>
+  </section>
 
   <!-- Auth view -->
   <section id="auth-view" class="hidden">
@@ -27,31 +57,84 @@
 
   <!-- Main view -->
   <section id="main-view" class="hidden">
-    <!-- Idle: start a new session -->
-    <form id="start-form">
-      <input id="intent" type="text" placeholder="What are you working on?" />
-      <label class="checkbox-row">
-        <input type="checkbox" id="include-open" />
-        Also capture tabs already open
-      </label>
-      <button type="submit" id="start-btn">Start session</button>
-    </form>
-
-    <!-- Active: a session is being tracked -->
-    <div id="active-panel" class="hidden">
-      <div class="active-card">
-        <span class="dot"></span>
-        <div class="active-info">
-          <div id="active-intent" class="session-title"></div>
-          <div id="active-meta" class="session-meta"></div>
+    <!-- Home screen: current status, start form, search, recent sessions -->
+    <div id="home-screen">
+      <!-- Active: a session is being tracked (shown as a hero card) -->
+      <div id="active-panel" class="hidden">
+        <div class="active-card">
+          <span class="dot"></span>
+          <div class="active-info">
+            <div id="active-intent" class="session-title"></div>
+            <div id="active-meta" class="session-meta"></div>
+          </div>
+          <button id="stop-btn">Stop &amp; save session</button>
+          <button id="new-session-btn">New session</button>
         </div>
       </div>
-      <button id="stop-btn">Stop &amp; save session</button>
+
+      <!-- Shown when starting a session while another is running: the running
+           one must be explicitly saved or discarded first. -->
+      <div id="conflict-prompt" class="hidden">
+        <p id="conflict-text"></p>
+        <div class="conflict-actions">
+          <button id="conflict-save">Save &amp; start new</button>
+          <button id="conflict-discard">Discard &amp; start new</button>
+          <button id="conflict-cancel" class="link">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Idle: start a new session -->
+      <form id="start-form">
+        <input id="intent" type="text" required placeholder="Describe what you're trying to find out..." />
+        <label class="checkbox-row">
+          <span class="checkbox">
+            <input type="checkbox" id="include-open" />
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 12 9 17 20 6" /></svg>
+          </span>
+          Also capture tabs already open
+        </label>
+        <button type="submit" id="start-btn">Start session</button>
+      </form>
+
+      <div id="sessions-section">
+        <h2>Your sessions</h2>
+        <ul id="recent-list"></ul>
+        <button id="see-all-btn" class="link hidden">See all sessions →</button>
+        <div id="empty-state" class="empty-state hidden">
+          <svg class="empty-icon" width="40" height="32" viewBox="0 0 40 32" fill="none" aria-hidden="true">
+            <path d="M2 9L9 2h27a2 2 0 0 1 2 2v20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            <circle cx="34" cy="27" r="5" fill="currentColor"/>
+          </svg>
+          <p class="muted">No sessions yet. Start one above. Monitar saves as you browse.</p>
+        </div>
+      </div>
     </div>
 
-    <h2>Saved sessions</h2>
-    <ul id="session-list"></ul>
-    <p id="empty-state" class="muted hidden">No saved sessions yet.</p>
+    <!-- History screen: full session list, search, restore + delete -->
+    <div id="history-screen" class="hidden">
+      <div class="history-header">
+        <button id="history-back-btn" class="icon-btn" aria-label="Back to home">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+        <h2 class="history-title">Search history</h2>
+      </div>
+
+      <div class="search-wrap">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input id="search-input" type="search" placeholder="You can search with your own words.." autocomplete="off" />
+        <span id="search-spinner" class="search-spinner hidden"></span>
+      </div>
+      <p id="model-status" class="model-status hidden"></p>
+
+      <ul id="session-list"></ul>
+      <ul id="search-results" class="hidden"></ul>
+      <p id="no-results" class="muted hidden">Nothing matches. Try describing the work "visa paperwork", "gift ideas".</p>
+    </div>
   </section>
 
   <p id="status" class="status hidden"></p>
