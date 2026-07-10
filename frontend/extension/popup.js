@@ -15,7 +15,7 @@ function getWorker() {
       if (data.message === "ready") {
         modelStatus.classList.add("hidden");
       } else {
-        modelStatus.textContent = "Setting up search — a few seconds, one time only…";
+        modelStatus.textContent = "Setting up search...";
         modelStatus.classList.remove("hidden");
       }
       return;
