@@ -13,6 +13,7 @@ const steps = [
   document.getElementById("step-done"),
 ];
 const DONE_INDEX = steps.length - 1;
+const ACCOUNT_INDEX = 2;
 
 const dots = [...document.querySelectorAll(".dot")];
 const skipBtn = document.getElementById("skip-btn");
@@ -22,6 +23,8 @@ const footer = document.getElementById("ob-footer");
 const accountForm = document.getElementById("account-form");
 const accountSubmit = document.getElementById("account-submit");
 const authToggle = document.getElementById("auth-toggle");
+const authModeLabel = document.getElementById("auth-mode-label");
+const accountTourLink = document.getElementById("account-tour-link");
 const nameInput = document.getElementById("name");
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
@@ -35,6 +38,7 @@ const sessionStatus = document.getElementById("session-status");
 
 let index = 0;
 let authMode = "signup"; // onboarding leads with sign-up
+let skippedToSignup = false; // set only by skip-btn; cleared by every other nav entry point
 
 // --- helpers ---
 function showStatus(el, message, kind = "error") {
@@ -56,11 +60,21 @@ function show(i) {
   backBtn.classList.toggle("hidden", !showBack);
   if (showBack) {
     // Sit the back button on the same line as this step's forward button.
-    steps[i].querySelector(".step-actions")?.prepend(backBtn);
+    steps[i].querySelector(".step-actions-row")?.prepend(backBtn);
   }
 
-  // Once the flow is complete there's nothing left to skip or step through.
-  skipBtn.classList.toggle("hidden", i === DONE_INDEX);
+  // The skip shortcut only makes sense before an account exists yet.
+  const showSkip = i === 0 || i === 1;
+  skipBtn.classList.toggle("hidden", !showSkip);
+  if (showSkip) {
+    // Stack it below this step's button row.
+    steps[i].querySelector(".step-actions")?.appendChild(skipBtn);
+  }
+
+  if (i === ACCOUNT_INDEX) {
+    accountTourLink.classList.toggle("hidden", !skippedToSignup);
+  }
+
   footer.classList.toggle("invisible", i === DONE_INDEX);
 
   // Remember progress so reopening onboarding resumes here instead of
@@ -100,14 +114,19 @@ async function isSignedIn() {
 }
 
 // --- navigation ---
-document.getElementById("hook-next").addEventListener("click", () => show(1));
+document.getElementById("hook-next").addEventListener("click", () => {
+  skippedToSignup = false;
+  show(1);
+});
 
 document.getElementById("privacy-next").addEventListener("click", async () => {
+  skippedToSignup = false;
   // Already signed in (e.g. re-opened onboarding) — skip straight to the aha.
   show((await isSignedIn()) ? 3 : 2);
 });
 
 backBtn.addEventListener("click", () => {
+  skippedToSignup = false;
   // From the session step, hop over the account step if it was auto-skipped.
   if (index === 3) {
     isSignedIn().then((signedIn) => show(signedIn ? 1 : 2));
@@ -116,9 +135,14 @@ backBtn.addEventListener("click", () => {
   }
 });
 
-skipBtn.addEventListener("click", async () => {
-  await markOnboarded();
-  await closeTab();
+skipBtn.addEventListener("click", () => {
+  skippedToSignup = true;
+  show(ACCOUNT_INDEX);
+});
+
+accountTourLink.addEventListener("click", () => {
+  skippedToSignup = false;
+  show(0);
 });
 
 // --- account (same logic as the popup's handleAuth) ---
@@ -131,6 +155,7 @@ function setAuthMode(mode) {
   authToggle.textContent = signup
     ? "Already have an account? Sign in"
     : "New here? Create an account";
+  authModeLabel.textContent = signup ? "You're signing up" : "You're signing in";
   clearStatus(accountStatus);
 }
 
@@ -157,7 +182,12 @@ accountForm.addEventListener("submit", async (e) => {
     }
     await deriveAndStoreKey(password, res.enc_salt);
     accountForm.reset();
-    show(3);
+    if (skippedToSignup) {
+      await markOnboarded();
+      await closeTab();
+    } else {
+      show(3);
+    }
   } catch (err) {
     showStatus(accountStatus, err.message);
   } finally {

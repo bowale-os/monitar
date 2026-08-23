@@ -11,13 +11,6 @@
   <link rel="stylesheet" href="onboarding.css" />
 </head>
 <body>
-  <header class="ob-header">
-    <div class="brand">
-      <span class="brand-name swash">Monitar</span>
-    </div>
-    <button id="skip-btn" class="link">I'll explore on my own</button>
-  </header>
-
   <main class="ob-main">
     <div class="confetti" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
 
@@ -38,7 +31,9 @@
         </figure>
       </div>
       <div class="step-actions">
-        <button class="primary" id="hook-next">Get started<svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg></button>
+        <div class="step-actions-row">
+          <button class="primary" id="hook-next">Get started<svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg></button>
+        </div>
       </div>
     </section>
 
@@ -79,7 +74,9 @@
         </ul>
       </div>
       <div class="step-actions">
-        <button class="primary" id="privacy-next">Continue<svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg></button>
+        <div class="step-actions-row">
+          <button class="primary" id="privacy-next">Continue<svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg></button>
+        </div>
       </div>
     </section>
 
@@ -93,6 +90,7 @@
         </p>
       </div>
       <div class="step-body">
+        <p id="auth-mode-label" class="auth-mode-label">You're signing up</p>
         <form id="account-form">
           <input id="name" type="text" placeholder="Name" autocomplete="name" />
           <input id="email" type="email" placeholder="Email" autocomplete="email" required />
@@ -104,9 +102,12 @@
           you forget it. Use a password manager.
         </p>
         <p id="account-status" class="status hidden"></p>
+        <button type="button" id="account-tour-link" class="link hidden">Back to onboarding</button>
       </div>
       <div class="step-actions">
-        <button type="submit" form="account-form" class="primary" id="account-submit">Create my account<svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg></button>
+        <div class="step-actions-row">
+          <button type="submit" form="account-form" class="primary" id="account-submit">Create my account<svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg></button>
+        </div>
       </div>
     </section>
 
@@ -131,10 +132,29 @@
             Include the tabs I already have open
           </label>
         </form>
+        <div class="tip-card">
+          <p>
+            <strong>Monitar is now in your toolbar.</strong> Click the
+            <span class="inline-icon" title="Extensions icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M9 6 V4.5 a2.5 2.5 0 0 1 5 0 V6 h4.5 A1.5 1.5 0 0 1 20 7.5 V12 h-1.5
+                         a2.5 2.5 0 0 0 0 5 H20 v3.5 a1.5 1.5 0 0 1 -1.5 1.5 H5.5
+                         A1.5 1.5 0 0 1 4 20.5 V7.5 A1.5 1.5 0 0 1 5.5 6 Z"/>
+              </svg>
+            </span>
+            icon, then the
+            <span class="inline-icon inline-icon-brand" title="Monitar icon">
+              <img src="icons/icon_32.png" alt="Monitar" />
+            </span>
+            icon, and make sure to pin it so it's always one click away.
+          </p>
+        </div>
         <p id="session-status" class="status hidden"></p>
       </div>
       <div class="step-actions">
-        <button type="submit" form="session-form" class="primary" id="session-submit">Start my first session<svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg></button>
+        <div class="step-actions-row">
+          <button type="submit" form="session-form" class="primary" id="session-submit">Start my first session<svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg></button>
+        </div>
       </div>
     </section>
 
@@ -161,7 +181,9 @@
         </div>
       </div>
       <div class="step-actions">
-        <button class="primary" id="done-btn">Done</button>
+        <div class="step-actions-row">
+          <button class="primary" id="done-btn">Done</button>
+        </div>
       </div>
     </section>
 
@@ -187,12 +209,15 @@
         </div>
       </div>
       <div class="step-actions">
-        <button class="primary" id="blocked-open-btn">Open Monitar</button>
+        <div class="step-actions-row">
+          <button class="primary" id="blocked-open-btn">Open Monitar</button>
+        </div>
       </div>
     </section>
   </main>
 
   <button type="button" id="back-btn" class="btn-outline hidden"><svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="20" y1="12" x2="4" y2="12"/><polyline points="11 5 4 12 11 19"/></svg>Back</button>
+  <button type="button" id="skip-btn" class="link hidden">Skip to sign up</button>
 
   <footer class="ob-footer" id="ob-footer">
     <div class="dots" id="dots">

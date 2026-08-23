@@ -43,6 +43,12 @@ function hostnameOf(url) {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return null; }
 }
 
+// Mirrors isTrackable() in background.js — tabs that won't end up in a session
+// (chrome://, extension pages, etc.) shouldn't be counted or shown in the picker.
+function isTrackableUrl(url) {
+  return !!url && /^https?:/i.test(url);
+}
+
 function buildEmbedText(payload) {
   const allTabs = Object.values(payload.windows ?? {}).flatMap(w => w.tabs ?? []);
 
@@ -85,6 +91,7 @@ const startForm = document.getElementById("start-form");
 const startBtn = document.getElementById("start-btn");
 const intentInput = document.getElementById("intent");
 const includeOpen = document.getElementById("include-open");
+const windowPicker = document.getElementById("window-picker");
 const activePanel = document.getElementById("active-panel");
 const activeIntent = document.getElementById("active-intent");
 const activeMeta = document.getElementById("active-meta");
@@ -109,6 +116,7 @@ const searchInput = document.getElementById("search-input");
 const searchSpinner = document.getElementById("search-spinner");
 const searchResults = document.getElementById("search-results");
 const noResults = document.getElementById("no-results");
+const resultsHeading = document.getElementById("results-heading");
 const modelStatus = document.getElementById("model-status");
 
 const statusEl = document.getElementById("status");
@@ -283,6 +291,7 @@ async function refreshSessionUI() {
     // Restore the last-used "capture already-open tabs" choice (default off).
     const { capture_existing_pref } = await chrome.storage.local.get("capture_existing_pref");
     includeOpen.checked = Boolean(capture_existing_pref);
+    await renderWindowPicker();
     // Restore a half-typed intent from a previous (possibly accidental) close.
     await loadIntentDraft();
   }
@@ -376,6 +385,30 @@ const RECENT_COUNT = 3;
 // content on every expand).
 const _previewCache = new Map();
 
+// Write-through mirror of _previewCache in chrome.storage.session (memory-only,
+// same lifetime as the AES key in crypto.js), so keyword search doesn't have to
+// re-decrypt every session on every popup open. Distinct key from crypto.js's
+// KEY_STORAGE. Only successful decrypts are persisted; cached Errors stay
+// in-memory only, as before.
+const PREVIEW_CACHE_STORAGE_KEY = "search_decrypt_cache_v1";
+
+// Always writes the full current in-memory map (never reads-then-modifies
+// storage first), so concurrent decrypts during ensureAllSessionsDecrypted()
+// can't race and clobber each other's entries.
+async function persistPreviewCache() {
+  const obj = {};
+  for (const [id, val] of _previewCache) {
+    if (!(val instanceof Error)) obj[id] = val;
+  }
+  await chrome.storage.session.set({ [PREVIEW_CACHE_STORAGE_KEY]: obj });
+}
+
+async function hydratePreviewCache() {
+  const { [PREVIEW_CACHE_STORAGE_KEY]: cached } = await chrome.storage.session.get(PREVIEW_CACHE_STORAGE_KEY);
+  if (!cached) return;
+  for (const [id, payload] of Object.entries(cached)) _previewCache.set(id, payload);
+}
+
 async function getDecryptedPayload(s) {
   if (_previewCache.has(s._id)) {
     const cached = _previewCache.get(s._id);
@@ -388,11 +421,86 @@ async function getDecryptedPayload(s) {
     if (!key) throw new Error("no-key");
     const payload = await decrypt(key, s.content_encrypted);
     _previewCache.set(s._id, payload);
+    await persistPreviewCache();
     return payload;
   } catch (err) {
     _previewCache.set(s._id, err);
     throw err;
   }
+}
+
+// --- keyword search (client-side, over decrypted content) ---
+const MIN_QUERY_LENGTH = 2;
+const KEYWORD_SESSIONS_CAP = 5;
+const KEYWORD_TABS_PER_SESSION_CAP = 3;
+
+// Fetches every session and decrypts each (skipping ones that fail), sorted
+// newest-first. GET / has no sort clause server-side, so recency order isn't
+// guaranteed and must be applied here.
+async function ensureAllSessionsDecrypted() {
+  const { data } = await api.listSessions();
+  const sessions = data || [];
+  const settled = await Promise.allSettled(
+    sessions.map(async (session) => ({ session, payload: await getDecryptedPayload(session) }))
+  );
+  const entries = settled
+    .filter((r) => r.status === "fulfilled")
+    .map((r) => r.value);
+  entries.sort((a, b) => (parseDate(b.session.started_at)?.getTime() ?? 0) - (parseDate(a.session.started_at)?.getTime() ?? 0));
+  return entries;
+}
+
+// Plain case-insensitive substring match over tab title/url and group title.
+function keywordSearchSessions(query, entries) {
+  const q = query.toLowerCase();
+  const matches = [];
+
+  for (const { session, payload } of entries) {
+    const windows = Object.values(payload.windows ?? {});
+    const allTabs = windows.flatMap((w) => w.tabs ?? []);
+    const groupTitles = windows.flatMap((w) => Object.values(w.groups ?? {}).map((g) => g.title).filter(Boolean));
+
+    const allMatchedTabs = allTabs.filter((t) =>
+      (t.title || "").toLowerCase().includes(q) || (t.url || "").toLowerCase().includes(q)
+    );
+    const matchedGroupTitles = groupTitles.filter((title) => title.toLowerCase().includes(q));
+
+    if (allMatchedTabs.length === 0 && matchedGroupTitles.length === 0) continue;
+
+    matches.push({
+      session,
+      matchedTabs: allMatchedTabs.slice(0, KEYWORD_TABS_PER_SESSION_CAP),
+      allMatchedTabs,
+      overflowTabCount: Math.max(0, allMatchedTabs.length - KEYWORD_TABS_PER_SESSION_CAP),
+      matchedGroupTitles,
+      groupOnlyMatch: allMatchedTabs.length === 0 && matchedGroupTitles.length > 0,
+    });
+  }
+
+  return {
+    results: matches.slice(0, KEYWORD_SESSIONS_CAP),
+    overflowSessionCount: Math.max(0, matches.length - KEYWORD_SESSIONS_CAP),
+  };
+}
+
+// --- highlighting (escape-then-wrap; never escape first and search inside
+// the escaped string, offsets from the raw string won't line up) ---
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function highlightMatch(text, query) {
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return escapeHtml(text);
+  const before = text.slice(0, idx);
+  const match = text.slice(idx, idx + query.length);
+  const after = text.slice(idx + query.length);
+  return `${escapeHtml(before)}<mark class="hl">${escapeHtml(match)}</mark>${escapeHtml(after)}`;
 }
 
 function renderPreview(panel, payload) {
@@ -478,7 +586,7 @@ async function togglePreview(s, panel, expandBtn) {
   panel.dataset.rendered = "1";
 }
 
-function buildSessionRow(s, { showDelete }) {
+function buildSessionRow(s, { showDelete, variant = "default" }) {
   const count = s.tab_count ?? 0;
 
   const li = document.createElement("li");
@@ -510,6 +618,7 @@ function buildSessionRow(s, { showDelete }) {
 
   const restoreBtn = document.createElement("button");
   restoreBtn.className = "restore-btn";
+  if (variant === "semantic") restoreBtn.classList.add("btn-outline");
   restoreBtn.textContent = "Restore";
   restoreBtn.addEventListener("click", () => restoreSession(s._id, restoreBtn));
   actions.append(restoreBtn);
@@ -525,12 +634,95 @@ function buildSessionRow(s, { showDelete }) {
   }
 
   row.append(expandBtn, info, actions);
+  li.append(row);
+
+  if (variant === "semantic") {
+    const relatedNote = document.createElement("p");
+    relatedNote.className = "kw-related-note muted";
+    relatedNote.textContent = "Related by topic, no literal match";
+    li.append(relatedNote);
+  }
 
   const preview = document.createElement("div");
   preview.className = "session-preview hidden";
   expandBtn.addEventListener("click", () => togglePreview(s, preview, expandBtn));
 
-  li.append(row, preview);
+  li.append(preview);
+  return li;
+}
+
+function buildSemanticOnlyRow(s) {
+  return buildSessionRow(s, { showDelete: true, variant: "semantic" });
+}
+
+// --- keyword result rendering ---
+function buildKeywordTabRow(t, query) {
+  const li = document.createElement("li");
+  li.className = "kw-tab-row";
+
+  const text = document.createElement("div");
+  text.className = "kw-tab-text";
+  const title = document.createElement("div");
+  title.className = "kw-tab-title";
+  title.innerHTML = highlightMatch(t.title || t.url || "", query);
+  const url = document.createElement("div");
+  url.className = "kw-tab-url muted";
+  url.innerHTML = highlightMatch(t.url || "", query);
+  text.append(title, url);
+
+  const openBtn = document.createElement("button");
+  openBtn.type = "button";
+  openBtn.className = "link kw-tab-open-btn";
+  openBtn.textContent = "Open";
+  openBtn.addEventListener("click", () => chrome.tabs.create({ url: t.url }));
+
+  li.append(text, openBtn);
+  return li;
+}
+
+function buildKeywordSessionRow(match, query) {
+  const { session: s, matchedTabs, allMatchedTabs, overflowTabCount, matchedGroupTitles, groupOnlyMatch } = match;
+  const li = buildSessionRow(s, { showDelete: true });
+  let anchor = li.querySelector(".session-row");
+
+  if (matchedGroupTitles.length) {
+    const chips = document.createElement("div");
+    chips.className = "kw-group-chips";
+    for (const title of matchedGroupTitles) {
+      const chip = document.createElement("span");
+      chip.className = "group-chip";
+      chip.innerHTML = highlightMatch(title, query);
+      chips.append(chip);
+    }
+    anchor.after(chips);
+    anchor = chips;
+  }
+
+  if (groupOnlyMatch) {
+    const note = document.createElement("p");
+    note.className = "kw-group-only-note muted";
+    note.textContent = "Matched by group name";
+    anchor.after(note);
+  } else if (matchedTabs.length) {
+    const tabTree = document.createElement("ul");
+    tabTree.className = "kw-tab-tree";
+    for (const t of matchedTabs) tabTree.append(buildKeywordTabRow(t, query));
+    anchor.after(tabTree);
+
+    if (overflowTabCount > 0) {
+      const moreBtn = document.createElement("button");
+      moreBtn.type = "button";
+      moreBtn.className = "link kw-tab-more-btn";
+      moreBtn.textContent = `+${overflowTabCount} more`;
+      moreBtn.addEventListener("click", () => {
+        tabTree.innerHTML = "";
+        for (const t of allMatchedTabs) tabTree.append(buildKeywordTabRow(t, query));
+        moreBtn.remove();
+      }, { once: true });
+      tabTree.after(moreBtn);
+    }
+  }
+
   return li;
 }
 
@@ -664,6 +856,199 @@ async function deleteSession(id, btn) {
   }
 }
 
+// --- per-window picker (shown under "Also capture tabs already open" when
+// more than one window is open, so the user chooses which windows a new
+// session captures instead of it being all-or-nothing) ---
+function faviconEl(tab) {
+  if (!tab.favIconUrl) {
+    const ph = document.createElement("span");
+    ph.className = "fav-placeholder";
+    return ph;
+  }
+  const img = document.createElement("img");
+  img.className = "fav";
+  img.src = tab.favIconUrl;
+  img.alt = "";
+  img.addEventListener("error", () => {
+    const ph = document.createElement("span");
+    ph.className = "fav-placeholder";
+    img.replaceWith(ph);
+  });
+  return img;
+}
+
+function checkIconSvg() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "check-icon");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "3");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  const poly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+  poly.setAttribute("points", "4 12 9 17 20 6");
+  svg.appendChild(poly);
+  return svg;
+}
+
+// wpWindows/wpSelected reflect the last render; empty wpWindows means the
+// picker isn't showing (single window, or the checkbox is off) — in which
+// case getSelectedWindowIds() returns null and every open window is captured.
+let wpWindows = [];
+let wpSelected = new Set();
+
+async function renderWindowPicker() {
+  windowPicker.innerHTML = "";
+  windowPicker.classList.remove("open");
+  wpWindows = [];
+  wpSelected = new Set();
+  if (!includeOpen.checked) return;
+
+  const [wins, current] = await Promise.all([
+    chrome.windows.getAll({ populate: true, windowTypes: ["normal"] }),
+    chrome.windows.getCurrent(),
+  ]);
+  if (wins.length <= 1) return; // nothing to choose between — checkbox alone is enough
+
+  wpWindows = wins;
+  wpSelected = new Set(wins.map((w) => w.id));
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "wp-toolbar";
+  const countEl = document.createElement("span");
+  countEl.className = "wp-count";
+  const selectAllBtn = document.createElement("button");
+  selectAllBtn.type = "button";
+  selectAllBtn.className = "link";
+  toolbar.append(countEl, selectAllBtn);
+
+  const list = document.createElement("ul");
+  list.className = "wp-list";
+
+  const updateCount = () => {
+    countEl.innerHTML = "";
+    const selB = document.createElement("b");
+    selB.textContent = String(wpSelected.size);
+    const totalB = document.createElement("b");
+    totalB.textContent = String(wins.length);
+    countEl.append(selB, " of ", totalB, ` open window${wins.length === 1 ? "" : "s"} selected`);
+    selectAllBtn.textContent = wpSelected.size === wins.length ? "Select none" : "Select all";
+  };
+
+  selectAllBtn.addEventListener("click", () => {
+    wpSelected = wpSelected.size === wins.length ? new Set() : new Set(wins.map((w) => w.id));
+    for (const row of list.children) {
+      const checked = wpSelected.has(Number(row.dataset.id));
+      row.classList.toggle("unchecked", !checked);
+      row.querySelector('input[type="checkbox"]').checked = checked;
+    }
+    updateCount();
+  });
+
+  for (const w of wins) {
+    const trackableTabs = (w.tabs || []).filter((t) => isTrackableUrl(t.url));
+    const anchorTab = trackableTabs.find((t) => t.active) || trackableTabs[0];
+
+    const row = document.createElement("li");
+    row.className = "wp-row";
+    row.dataset.id = w.id;
+
+    const main = document.createElement("div");
+    main.className = "wp-row-main";
+
+    const cbWrap = document.createElement("span");
+    cbWrap.className = "checkbox small";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = true;
+    cb.setAttribute("aria-label", `Include this window (${trackableTabs.length} tabs)`);
+    cbWrap.append(cb, checkIconSvg());
+
+    const text = document.createElement("div");
+    text.className = "wp-text";
+
+    const labelLine = document.createElement("div");
+    labelLine.className = "wp-label-line";
+    const label = document.createElement("span");
+    label.className = "wp-label";
+    label.textContent = anchorTab ? anchorTab.title || anchorTab.url : "Empty window";
+    labelLine.appendChild(label);
+    if (w.id === current.id) {
+      const tag = document.createElement("span");
+      tag.className = "wp-tag";
+      tag.textContent = "This window";
+      labelLine.appendChild(tag);
+    }
+    const countPill = document.createElement("span");
+    countPill.className = "wp-count-pill";
+    countPill.textContent = `${trackableTabs.length} tab${trackableTabs.length === 1 ? "" : "s"}`;
+    labelLine.appendChild(countPill);
+
+    const favRow = document.createElement("div");
+    favRow.className = "wp-favicons";
+    trackableTabs.slice(0, 5).forEach((t) => favRow.appendChild(faviconEl(t)));
+    if (trackableTabs.length > 5) {
+      const more = document.createElement("span");
+      more.className = "fav-more";
+      more.textContent = `+${trackableTabs.length - 5} more`;
+      favRow.appendChild(more);
+    }
+
+    text.append(labelLine, favRow);
+
+    const expandBtn = document.createElement("button");
+    expandBtn.type = "button";
+    expandBtn.className = "wp-expand-btn";
+    expandBtn.setAttribute("aria-label", "Show tabs in this window");
+    expandBtn.innerHTML =
+      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>';
+
+    main.append(cbWrap, text, expandBtn);
+    row.appendChild(main);
+
+    const tabsList = document.createElement("ul");
+    tabsList.className = "wp-tabs";
+    trackableTabs.forEach((t) => {
+      const li = document.createElement("li");
+      const tt = document.createElement("span");
+      tt.className = "tt";
+      tt.textContent = t.title || t.url;
+      li.append(faviconEl(t), tt);
+      tabsList.appendChild(li);
+    });
+    row.appendChild(tabsList);
+
+    cb.addEventListener("change", () => {
+      if (cb.checked) wpSelected.add(w.id);
+      else wpSelected.delete(w.id);
+      row.classList.toggle("unchecked", !cb.checked);
+      updateCount();
+    });
+    main.addEventListener("click", (e) => {
+      if (e.target === cb || e.target.closest(".checkbox")) return;
+      if (e.target.closest(".wp-expand-btn")) {
+        row.classList.toggle("expanded");
+        return;
+      }
+      cb.checked = !cb.checked;
+      cb.dispatchEvent(new Event("change"));
+    });
+
+    list.appendChild(row);
+  }
+
+  updateCount();
+  windowPicker.append(toolbar, list);
+  windowPicker.classList.add("open");
+}
+
+// null means "picker wasn't shown" — background.js treats that as capture every window.
+function getSelectedWindowIds() {
+  if (wpWindows.length === 0) return null;
+  return Array.from(wpSelected);
+}
+
 async function handleStart(e) {
   e.preventDefault();
   clearStatus();
@@ -675,17 +1060,19 @@ async function handleStart(e) {
   startBtn.disabled = true;
   try {
     const captureExisting = includeOpen.checked;
+    const windowIds = captureExisting ? getSelectedWindowIds() : null;
     // Remember this choice for the next session.
     await chrome.storage.local.set({ capture_existing_pref: captureExisting });
     const res = await chrome.runtime.sendMessage({
       type: "START_SESSION",
       intent,
       captureExisting,
+      windowIds,
     });
     if (res?.code === "SESSION_ACTIVE") {
       // A session is still running — the user decides its fate before the
       // new one starts. Keep the typed intent around until they do.
-      showConflictPrompt(res.intent, { intent, captureExisting });
+      showConflictPrompt(res.intent, { intent, captureExisting, windowIds });
       return;
     }
     intentInput.value = "";
@@ -820,6 +1207,8 @@ async function handleSignout() {
     await chrome.runtime.sendMessage({ type: "ABORT_SESSION" });
   } catch (_) {}
   await clearKey();
+  _previewCache.clear();
+  await chrome.storage.session.remove(PREVIEW_CACHE_STORAGE_KEY);
   // Wipe all local state, but keep the onboarding flag — signing out must not
   // re-onboard a returning user.
   const { [ONBOARDED_KEY]: hasOnboarded } = await chrome.storage.local.get(ONBOARDED_KEY);
@@ -845,6 +1234,8 @@ function showSessionsSection() {
   searchResults.classList.add("hidden");
   searchResults.innerHTML = "";
   noResults.classList.add("hidden");
+  resultsHeading.classList.add("hidden");
+  resultsHeading.textContent = "";
 }
 
 function showSearchSection() {
@@ -856,25 +1247,45 @@ function resetSearch() {
   showSessionsSection();
 }
 
-function renderSearchResults(sessions) {
+// Dedups by _id (a session matching both engines renders once, in the
+// keyword/highlighted shape), renders keyword rows first then semantic-only
+// rows after, and shows one combined overflow line sourced only from the
+// keyword side (semantic has no "N more" concept of its own).
+function renderSearchResults(keywordResult, semanticSessions, query) {
   searchResults.innerHTML = "";
   noResults.classList.add("hidden");
+  resultsHeading.classList.add("hidden");
 
-  if (sessions.length === 0) {
+  const matchedIds = new Set(keywordResult.results.map((m) => m.session._id));
+  const semanticOnly = semanticSessions.filter((s) => !matchedIds.has(s._id));
+
+  const total = keywordResult.results.length + semanticOnly.length;
+  if (total === 0) {
     searchResults.classList.add("hidden");
     noResults.classList.remove("hidden");
     return;
   }
 
   searchResults.classList.remove("hidden");
-  for (const s of sessions) searchResults.append(buildSessionRow(s, { showDelete: true }));
+  resultsHeading.textContent = `Sessions · ${total}`;
+  resultsHeading.classList.remove("hidden");
+
+  for (const match of keywordResult.results) searchResults.append(buildKeywordSessionRow(match, query));
+  for (const s of semanticOnly) searchResults.append(buildSemanticOnlyRow(s));
+
+  if (keywordResult.overflowSessionCount > 0) {
+    const note = document.createElement("p");
+    note.className = "search-overflow-note";
+    note.textContent = `${keywordResult.overflowSessionCount} more matched. Keep typing to narrow it down.`;
+    searchResults.append(note);
+  }
 }
 
 let _searchDebounce = null;
 
 async function handleSearch() {
   const query = searchInput.value.trim();
-  if (!query) {
+  if (query.length < MIN_QUERY_LENGTH) {
     showSessionsSection();
     return;
   }
@@ -882,11 +1293,39 @@ async function handleSearch() {
   showSearchSection();
   searchSpinner.classList.remove("hidden");
   try {
-    const vector = await embed(query);
-    const { data } = await api.searchSessions(vector);
-    renderSearchResults(data || []);
-  } catch (err) {
-    handleError(err);
+    // Both engines always run in parallel; one failing shouldn't block the
+    // other. Only render once BOTH settle — semantic-only cards rely on
+    // ensureAllSessionsDecrypted() (the keyword branch) having already warmed
+    // _previewCache with that session's real decrypted payload, so their
+    // preview chevron works without a separate fetch/decrypt.
+    const [keywordSettled, semanticSettled] = await Promise.allSettled([
+      (async () => {
+        const entries = await ensureAllSessionsDecrypted();
+        return keywordSearchSessions(query, entries);
+      })(),
+      (async () => {
+        const vector = await embed(query);
+        const { data } = await api.searchSessions(vector);
+        return data || [];
+      })(),
+    ]);
+
+    if (keywordSettled.status === "rejected" && semanticSettled.status === "rejected") {
+      const authError = [keywordSettled.reason, semanticSettled.reason].find(
+        (err) => err instanceof SessionExpiredError || err?.name === "SessionExpiredError"
+      );
+      if (authError) {
+        handleError(authError);
+        return;
+      }
+    }
+
+    const keywordResult = keywordSettled.status === "fulfilled"
+      ? keywordSettled.value
+      : { results: [], overflowSessionCount: 0 };
+    const semanticSessions = semanticSettled.status === "fulfilled" ? semanticSettled.value : [];
+
+    renderSearchResults(keywordResult, semanticSessions, query);
   } finally {
     searchSpinner.classList.add("hidden");
   }
@@ -897,6 +1336,7 @@ tabSignin.addEventListener("click", () => setAuthMode("signin"));
 tabSignup.addEventListener("click", () => setAuthMode("signup"));
 authForm.addEventListener("submit", handleAuth);
 startForm.addEventListener("submit", handleStart);
+includeOpen.addEventListener("change", renderWindowPicker);
 stopBtn.addEventListener("click", handleStop);
 // While a session runs the start form is hidden; "New session" reveals it so
 // submitting can trigger the save/discard conflict flow.
@@ -950,6 +1390,7 @@ window.addEventListener("focus", async () => {   // ← add this
     if (key) {
       // Signed in and able to decrypt — go straight to sessions, even if the
       // onboarding tab was closed early.
+      await hydratePreviewCache();
       showMainView();
       await refreshSessionUI();
       await loadSessions();

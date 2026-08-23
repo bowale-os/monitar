@@ -41,7 +41,7 @@
 * { scrollbar-width: none; -ms-overflow-style: none; }
 *::-webkit-scrollbar { display: none; }
 
-html, body { width: 412px; height: 700px; overflow: hidden; }
+html, body { width: 412px; height: 600px; overflow: hidden; }
 body {
   margin: 0; padding: 20px;
   font-family: var(--font-sans); font-size: var(--text-base);
@@ -65,26 +65,12 @@ body {
 .confetti span:nth-child(10) { bottom: 220px; left: 30px; width: 6px; height: 6px; background: var(--color-gold); }
 
 header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.brand { display: flex; align-items: center; gap: 9px; }
+.brand-logo { width: 24px; height: 24px; display: block; }
 .header-actions { display: flex; align-items: center; gap: 8px; }
 
 .icon-btn { display: flex; align-items: center; justify-content: center; padding: 6px; background: transparent; color: var(--color-text); border: 1px solid transparent; border-radius: var(--radius-sm); }
 .icon-btn:hover { background: var(--color-surface); border-color: var(--color-border); }
 .icon-btn svg { display: block; }
-h1 { font-family: var(--font-brand); font-weight: 800; font-size: 22px; letter-spacing: -0.01em; margin: 0; }
-
-/* --- hand-drawn mint highlight swash, used behind the "Monitar" wordmark and onboarding headline keywords --- */
-.swash { position: relative; white-space: nowrap; }
-.swash::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  left: -8px; right: -8px; bottom: 2px; height: 62%;
-  background: var(--color-accent);
-  border-radius: 50% 45% 55% 48% / 60% 45% 55% 45%;
-  transform: rotate(-2deg);
-}
-.brand .swash::before { left: -6px; right: -6px; bottom: 0; height: 56%; }
 h2 { font-size: var(--text-sm); text-transform: uppercase; letter-spacing: .04em; color: var(--color-text-muted); margin: 22px 0 10px; font-weight: 700; }
 
 .hidden { display: none !important; }
@@ -107,6 +93,10 @@ button:focus-visible, a:focus-visible, .tab:focus-visible, .trash-btn:focus-visi
 #auth-submit, #start-btn, #nudge-btn { width: 100%; padding: 12px; background: var(--color-accent); color: var(--color-accent-contrast); border-color: var(--color-border); }
 #auth-submit:hover, #start-btn:hover, #nudge-btn:hover { background: var(--color-accent-hover); }
 button:disabled { opacity: .55; cursor: default; }
+
+#nudge-btn { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-arrow { flex-shrink: 0; transition: transform .15s ease; }
+#nudge-btn:hover .btn-arrow { transform: translateX(2px); }
 
 #start-form { padding: 16px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: 14px; }
 
@@ -148,6 +138,46 @@ button:disabled { opacity: .55; cursor: default; }
 .checkbox:has(input:checked) { background: var(--color-accent); border-color: var(--color-border); }
 .checkbox:has(input:checked) .check-icon { opacity: 1; transform: scale(1); }
 .checkbox:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--color-accent-soft); }
+.checkbox.small { width: 16px; height: 16px; border-radius: 5px; }
+.checkbox.small .check-icon { width: 11px; height: 11px; }
+
+/* --- per-window picker, shown under "Also capture tabs already open" when more than one window is open --- */
+.window-picker { margin: 0 0 10px; overflow: hidden; max-height: 0; opacity: 0; transition: max-height .18s ease, opacity .12s ease; }
+.window-picker.open { max-height: 220px; opacity: 1; }
+
+.wp-toolbar { display: flex; align-items: baseline; justify-content: space-between; padding: 0 1px 7px; }
+.wp-count { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; color: var(--color-text-muted); }
+.wp-count b { color: var(--color-text); font-variant-numeric: tabular-nums; }
+
+.wp-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); max-height: 180px; overflow-y: auto; }
+.wp-row { border-bottom: 1px solid var(--color-divider); }
+.wp-row:last-child { border-bottom: none; }
+.wp-row-main { display: flex; align-items: flex-start; gap: 9px; padding: 9px 10px; cursor: pointer; }
+.wp-row.unchecked { background: var(--color-bg); }
+.wp-row.unchecked .wp-label, .wp-row.unchecked .wp-favicons { opacity: .45; }
+
+.wp-text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.wp-label-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.wp-label { font-size: 12.5px; font-weight: 600; color: var(--color-text); }
+.wp-tag { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2px 6px; border-radius: 999px; background: var(--color-accent); border: 1px solid var(--color-border); line-height: 1.4; }
+.wp-count-pill { font-size: 10px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; border: 1px solid var(--color-divider); border-radius: 999px; padding: 1px 7px; }
+
+.wp-favicons { display: flex; align-items: center; }
+.wp-favicons img.fav { width: 14px; height: 14px; border-radius: 3px; background: var(--color-surface); margin-left: -4px; display: block; }
+.wp-favicons img.fav:first-child { margin-left: 0; }
+.fav-placeholder { width: 14px; height: 14px; border-radius: 3px; background: var(--color-divider); margin-left: -4px; }
+.fav-placeholder:first-child { margin-left: 0; }
+.fav-more { font-size: 10px; color: var(--color-text-muted); margin-left: 5px; }
+
+.wp-expand-btn { flex-shrink: 0; width: 18px; height: 18px; border: none; background: none; padding: 0; display: flex; align-items: center; justify-content: center; color: var(--color-text-muted); cursor: pointer; margin-top: 1px; }
+.wp-expand-btn svg { transition: transform .15s ease; }
+.wp-row.expanded .wp-expand-btn svg { transform: rotate(180deg); }
+
+.wp-tabs { list-style: none; margin: 0; padding: 0 10px 9px 33px; display: none; flex-direction: column; gap: 5px; }
+.wp-row.expanded .wp-tabs { display: flex; }
+.wp-tabs li { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--color-text-muted); }
+.wp-tabs img.fav, .wp-tabs .fav-placeholder { width: 12px; height: 12px; margin: 0; flex-shrink: 0; border-radius: 3px; }
+.wp-tabs .tt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text); }
 
 #auth-view { margin-top: 15vh; }
 
@@ -187,6 +217,12 @@ button:disabled { opacity: .55; cursor: default; }
 
 .restore-btn { padding: 7px 13px; background: var(--color-accent); color: var(--color-accent-contrast); font-weight: 700; border-radius: var(--radius-sm); border: 1px solid var(--color-border); }
 .restore-btn:hover { background: var(--color-accent-hover); }
+
+/* Reusable outline variant (same token values as #stop-btn, #new-session-btn),
+   used for the semantic-only "Restore" so it reads as visually quieter than
+   the mint-filled keyword-match Restore. */
+.btn-outline { background: var(--color-surface); color: var(--color-text); border-color: var(--color-border); }
+.btn-outline:hover { background: var(--color-bg); }
 
 .trash-btn { display: flex; align-items: center; justify-content: center; padding: 7px; background: transparent; color: var(--color-text); line-height: 1; border-radius: var(--radius-sm); border: 1px solid transparent; }
 .trash-btn svg { display: block; }
@@ -236,6 +272,23 @@ button:disabled { opacity: .55; cursor: default; }
 #sessions-section { margin-top: 10px; }
 #search-results { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 
+.results-heading { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; color: var(--color-text-muted); margin: 4px 0 8px; }
+
+mark.hl { background: var(--color-gold); color: var(--color-text); border-radius: 3px; padding: 0 2px; }
+
+.kw-group-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.kw-group-only-note, .kw-related-note { font-size: var(--text-xs); margin: 8px 0 0; }
+
+.kw-tab-tree { list-style: none; margin: 10px 0 0; padding: 10px 0 0; border-top: 1px solid var(--color-divider); display: flex; flex-direction: column; gap: 8px; }
+.kw-tab-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.kw-tab-text { min-width: 0; flex: 1; }
+.kw-tab-title { font-size: var(--text-sm); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kw-tab-url { font-size: var(--text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kw-tab-open-btn { flex-shrink: 0; }
+.kw-tab-more-btn { display: block; margin: 4px 0 0; }
+
+.search-overflow-note { font-size: var(--text-xs); color: var(--color-text-muted); margin: 10px 0 0; text-align: center; }
+
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-5) var(--space-3); text-align: center; color: var(--color-text-muted); }
 .empty-icon { color: var(--color-divider); }
 .empty-state p { margin: 0; max-width: 30ch; }
@@ -252,7 +305,29 @@ button:disabled { opacity: .55; cursor: default; }
 }
 .undo-btn:hover { background: var(--color-accent); }
 
-.nudge-card { margin-top: var(--space-6); padding: var(--space-5); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); text-align: center; display: flex; flex-direction: column; align-items: center; }
-.nudge-icon { color: var(--color-text); background: var(--color-accent); padding: 12px; border-radius: 50%; border: 1px solid var(--color-border); margin-bottom: var(--space-3); }
-.nudge-title { font-weight: 700; font-size: 18px; line-height: 1.3; color: var(--color-text); margin: 0 0 8px; width: 100%; }
-.nudge-body { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0 0 14px; line-height: 1.45; }
+#setup-nudge { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.nudge-card {
+  flex: 0 0 auto; height: 480px; margin-top: 16px; overflow: hidden;
+  padding: 18px 24px; background: var(--color-surface);
+  border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  display: flex; flex-direction: column;
+}
+
+/* --- decorative stack of three overlapping "tabs", standing in for the icon --- */
+.nudge-stack { position: relative; height: 68px; margin: 2px 0 16px 6px; flex-shrink: 0; }
+.nudge-tab {
+  position: absolute; top: 0; width: 96px; height: 62px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  display: flex; flex-direction: column; padding: 6px 7px;
+}
+.nudge-tab-dots { display: flex; gap: 4px; margin-bottom: 6px; }
+.nudge-tab-dots span { width: 5px; height: 5px; border-radius: 50%; background: rgba(0, 0, 0, .55); }
+.nudge-tab-line { height: 5px; border-radius: 3px; background: rgba(0, 0, 0, .14); margin-bottom: 4px; }
+.nudge-tab-line.short { width: 60%; }
+.nudge-tab-1 { left: 0; background: var(--color-peach); transform: rotate(-7deg); z-index: 1; }
+.nudge-tab-2 { left: 35px; background: var(--color-sky); transform: rotate(3deg); z-index: 2; }
+.nudge-tab-3 { left: 70px; background: var(--color-accent); transform: rotate(-2deg); z-index: 3; }
+
+.nudge-title { font-family: var(--font-display); font-weight: 400; font-size: 20px; line-height: 1.25; color: var(--color-text); margin: 0 0 8px; flex-shrink: 0; }
+.nudge-body { color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.45; margin: 0; max-width: 32ch; flex-shrink: 0; }
+.nudge-spacer { flex: 1; min-height: 0; }

@@ -12,3 +12,6 @@ bcrypt
 python-jose[cryptography]
 pydantic[email]
 numpy
+pytest
+pytest-asyncio
+pytest-cov

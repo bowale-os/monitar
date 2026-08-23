@@ -87,42 +87,35 @@ function toPayload(s) {
 // false, start empty and only capture tabs opened/navigated after start.
 // (With captureExisting=false, navigating a pre-existing tab to a new URL still
 // counts as new — onUpdated adds it. That's intended.)
-async function startSession(intent, captureExisting) {
+async function startSession(intent, captureExisting, windowIds) {
   const tabs = {};
   const groups = {};
   let activeTabId = null;
 
   if (captureExisting) {
+    const inScope = (windowId) => windowIds == null || windowIds.includes(windowId);
+
     const allTabs = await chrome.tabs.query({}); // all windows
     for (const t of allTabs) {
-      if (isTrackable(t.url)) {
+      if (isTrackable(t.url) && inScope(t.windowId)) {
         const rec = newTabRecord(t.url, t.title, 0, t.windowId, t.groupId);
         rec.is_last_opened = false;
         tabs[t.id] = rec;
       }
     }
 
-  
     const allGroups = await chrome.tabGroups.query({});
     for (const g of allGroups) {
+      if (!inScope(g.windowId)) continue;
       groups[g.id] = {
         title: g.title,
         color: g.color,
         window_id: g.windowId,
       };
     }
-  
+
     const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (active && tabs[active.id]) activeTabId = active.id;
-  }
-
-  const allGroups = await chrome.tabGroups.query({});
-  for (const g of allGroups) {
-    groups[g.id] = {
-      title: g.title,
-      color: g.color,
-      window_id: g.windowId,
-    };
   }
 
   const s = {
@@ -282,7 +275,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           if (msg.onConflict === "save") await stopSession(msg.vector ?? null);
           else await abortSession();
         }
-        await startSession(msg.intent, msg.captureExisting);
+        await startSession(msg.intent, msg.captureExisting, msg.windowIds);
         sendResponse({ ok: true });
       }
     } else if (msg.type === "GET_SESSION_DATA") {
