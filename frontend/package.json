@@ -1,0 +1,14 @@
+{
+  "name": "monitar-extension",
+  "version": "0.2.2",
+  "private": true,
+  "type": "module",
+  "description": "Monitar browser extension - unit tests for the pure helpers in extension/helpers.js",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.9"
+  }
+}

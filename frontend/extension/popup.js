@@ -1,5 +1,18 @@
 import { api, getTokens, setTokens, SessionExpiredError } from "./api.js";
 import { deriveAndStoreKey, clearKey, loadKey, decrypt} from "./crypto.js";
+import {
+  JUNK_TITLES,
+  hostnameOf,
+  isTrackableUrl,
+  buildEmbedText,
+  formatRelativeDate,
+  formatSince,
+  sessionRecency,
+  sortSessionsByRecency,
+  highlightMatch,
+  keywordSearchSessions,
+  MIN_QUERY_LENGTH,
+} from "./helpers.js";
 
 // --- embed worker ---
 let _worker = null;
@@ -35,40 +48,6 @@ function embed(text) {
     _pending.set(id, { resolve, reject });
     getWorker().postMessage({ id, text });
   });
-}
-
-const JUNK_TITLES = new Set(["new tab", "loading...", "404 not found", "untitled", "about:blank"]);
-
-function hostnameOf(url) {
-  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return null; }
-}
-
-// Mirrors isTrackable() in background.js — tabs that won't end up in a session
-// (chrome://, extension pages, etc.) shouldn't be counted or shown in the picker.
-function isTrackableUrl(url) {
-  return !!url && /^https?:/i.test(url);
-}
-
-function buildEmbedText(payload) {
-  const allTabs = Object.values(payload.windows ?? {}).flatMap(w => w.tabs ?? []);
-
-  const groupNames = Object.values(payload.windows ?? {})
-    .flatMap(w => Object.values(w.groups ?? {}).map(g => g.title).filter(Boolean));
-
-  const domains = [...new Set(allTabs.map(t => hostnameOf(t.url)).filter(Boolean))];
-
-  const titles = allTabs
-    .map(t => (t.title || "").trim())
-    .filter(t => t && !JUNK_TITLES.has(t.toLowerCase()));
-
-  const parts = [
-    `Intent: ${payload.intent || "Untitled"}.`,
-    groupNames.length ? `Topics: ${groupNames.join(", ")}.` : "",
-    domains.length ? `Sites: ${domains.join(", ")}.` : "",
-    titles.length ? `Pages: ${titles.join("; ")}.` : "",
-  ].filter(Boolean).join(" ");
-
-  return parts.slice(0, 1000);
 }
 
 // --- element refs ---
@@ -176,44 +155,6 @@ function handleError(err) {
   } else {
     showStatus(err.message);
   }
-}
-
-function parseDate(iso) {
-  if (!iso) return null;
-  const d = new Date(iso.replace("+00:00", "Z"));
-  return isNaN(d) ? null : d;
-}
-
-function formatTime(d) {
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
-// Relative, scannable dates for session cards: "Today 2:14 PM", "Yesterday",
-// "3 days ago", then "Jun 12" (with the year once it's not this year).
-function formatRelativeDate(iso) {
-  const d = parseDate(iso);
-  if (!d) return "";
-
-  const now = new Date();
-  const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
-  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
-
-  if (dayDiff <= 0) return `Today ${formatTime(d)}`;
-  if (dayDiff === 1) return "Yesterday";
-  if (dayDiff < 7) return `${dayDiff} days ago`;
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
-  });
-}
-
-// For the active-session card: "since 2:14 PM" today, otherwise the date too.
-function formatSince(iso) {
-  const d = parseDate(iso);
-  if (!d) return "";
-  const rel = formatRelativeDate(iso);
-  return rel.startsWith("Today ") ? rel.slice(6) : rel;
 }
 
 // The popup is destroyed every time it closes, so typed text is lost. Persist
@@ -430,9 +371,6 @@ async function getDecryptedPayload(s) {
 }
 
 // --- keyword search (client-side, over decrypted content) ---
-const MIN_QUERY_LENGTH = 2;
-const KEYWORD_SESSIONS_CAP = 5;
-const KEYWORD_TABS_PER_SESSION_CAP = 3;
 
 // Fetches every session and decrypts each (skipping ones that fail), sorted
 // newest-first. GET / has no sort clause server-side, so recency order isn't
@@ -446,61 +384,8 @@ async function ensureAllSessionsDecrypted() {
   const entries = settled
     .filter((r) => r.status === "fulfilled")
     .map((r) => r.value);
-  entries.sort((a, b) => (parseDate(b.session.started_at)?.getTime() ?? 0) - (parseDate(a.session.started_at)?.getTime() ?? 0));
+  entries.sort((a, b) => sessionRecency(b.session) - sessionRecency(a.session));
   return entries;
-}
-
-// Plain case-insensitive substring match over tab title/url and group title.
-function keywordSearchSessions(query, entries) {
-  const q = query.toLowerCase();
-  const matches = [];
-
-  for (const { session, payload } of entries) {
-    const windows = Object.values(payload.windows ?? {});
-    const allTabs = windows.flatMap((w) => w.tabs ?? []);
-    const groupTitles = windows.flatMap((w) => Object.values(w.groups ?? {}).map((g) => g.title).filter(Boolean));
-
-    const allMatchedTabs = allTabs.filter((t) =>
-      (t.title || "").toLowerCase().includes(q) || (t.url || "").toLowerCase().includes(q)
-    );
-    const matchedGroupTitles = groupTitles.filter((title) => title.toLowerCase().includes(q));
-
-    if (allMatchedTabs.length === 0 && matchedGroupTitles.length === 0) continue;
-
-    matches.push({
-      session,
-      matchedTabs: allMatchedTabs.slice(0, KEYWORD_TABS_PER_SESSION_CAP),
-      allMatchedTabs,
-      overflowTabCount: Math.max(0, allMatchedTabs.length - KEYWORD_TABS_PER_SESSION_CAP),
-      matchedGroupTitles,
-      groupOnlyMatch: allMatchedTabs.length === 0 && matchedGroupTitles.length > 0,
-    });
-  }
-
-  return {
-    results: matches.slice(0, KEYWORD_SESSIONS_CAP),
-    overflowSessionCount: Math.max(0, matches.length - KEYWORD_SESSIONS_CAP),
-  };
-}
-
-// --- highlighting (escape-then-wrap; never escape first and search inside
-// the escaped string, offsets from the raw string won't line up) ---
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function highlightMatch(text, query) {
-  const idx = text.toLowerCase().indexOf(query.toLowerCase());
-  if (idx === -1) return escapeHtml(text);
-  const before = text.slice(0, idx);
-  const match = text.slice(idx, idx + query.length);
-  const after = text.slice(idx + query.length);
-  return `${escapeHtml(before)}<mark class="hl">${escapeHtml(match)}</mark>${escapeHtml(after)}`;
 }
 
 function renderPreview(panel, payload) {
@@ -727,8 +612,11 @@ function buildKeywordSessionRow(match, query) {
 }
 
 // Renders the full list (History screen) and the recent slice (Home screen)
-// from the same fetched array, so there's only ever one API call.
+// from the same fetched array, so there's only ever one API call. GET / has no
+// server-side sort, so order newest-first here before slicing the recent list.
 function renderSessions(sessions) {
+  sessions = sortSessionsByRecency(sessions);
+
   sessionList.innerHTML = "";
   for (const s of sessions) sessionList.append(buildSessionRow(s, { showDelete: true }));
 
