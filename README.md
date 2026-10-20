@@ -83,6 +83,8 @@ pytest
 cd frontend && npm install && npm test
 ```
 
+The backend suite enforces 100% line coverage of the app code (`.coveragerc`), and dependencies are pinned in `backend/requirements.txt`.
+
 Backend tests that need MongoDB use a throwaway `monitar_test` database and are skipped if `MONGODB_CONNECT` is unset. Every push and pull request runs both suites in GitHub Actions against a MongoDB service container.
 
 ## Repository layout

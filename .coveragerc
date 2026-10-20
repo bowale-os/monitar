@@ -1,0 +1,6 @@
+[run]
+omit = backend/app/tests/*
+
+[report]
+fail_under = 100
+show_missing = True

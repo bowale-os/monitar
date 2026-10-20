@@ -8,3 +8,4 @@ resume-bullets.md
 *.ini
 node_modules/
 !pytest.ini
+.coverage

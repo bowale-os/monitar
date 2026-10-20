@@ -49,3 +49,19 @@ def test_refresh_token_hash_is_stable_and_unique():
     assert hash1 != hash2
     # Hashing the raw token reproduces the stored hash (enables lookup).
     assert hash1 == security.hash_refresh_token(raw1)
+
+
+def test_import_refuses_missing_or_short_secret_key(monkeypatch):
+    """A weak SECRET_KEY must stop the app from starting at all."""
+    import importlib
+    import os
+
+    good_key = os.environ["SECRET_KEY"]
+    monkeypatch.setenv("SECRET_KEY", "too-short")
+    try:
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            importlib.reload(security)
+    finally:
+        # Put the module back into its normal state for every other test.
+        monkeypatch.setenv("SECRET_KEY", good_key)
+        importlib.reload(security)

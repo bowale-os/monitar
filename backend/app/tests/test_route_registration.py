@@ -1,3 +1,5 @@
+from starlette.routing import Match
+
 from backend.app.main import app
 
 
@@ -6,14 +8,17 @@ def test_privacy_route_registered_before_dynamic_session_route():
     GET /{session_id} -- the two routers are flat (no prefixes), so
     registration order is what prevents the dynamic segment from shadowing
     the static one. This is the regression test for the collision called out
-    in backend/app/main.py's own comment."""
-    paths_in_order = [getattr(r, "path", None) for r in app.router.routes]
-    privacy_index = paths_in_order.index("/privacy")
-    dynamic_session_indices = [
-        i for i, p in enumerate(paths_in_order) if p == "/{session_id}"
-    ]
-    assert dynamic_session_indices, "expected at least one /{session_id} route"
-    assert all(privacy_index < i for i in dynamic_session_indices)
+    in backend/app/main.py's own comment.
+
+    Asks the router which route wins instead of inspecting the route list,
+    because newer FastAPI versions don't expose included routes flat."""
+    scope = {"type": "http", "path": "/privacy", "method": "GET"}
+    for route in app.router.routes:
+        match, _ = route.matches(scope)
+        if match == Match.FULL:
+            assert getattr(route, "path", None) == "/privacy"
+            return
+    raise AssertionError("no route matched GET /privacy")
 
 
 def test_privacy_route_returns_html_not_401(client):
