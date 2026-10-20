@@ -9,8 +9,6 @@
 
 <p align="center"><img src="docs/demo.gif" alt="Monitar demo: start a session and restore past sessions" width="320"></p>
 
-![Monitar popup](frontend/extension/store/screenshotofmonitar_1280x800.jpg)
-
 ## Why it exists
 
 - **Privacy first.** Session contents (titles, URLs) are encrypted client-side with AES-256-GCM. The key is derived from your password with PBKDF2 and never sent to the server. A database leak exposes ciphertext, not your browsing history.
