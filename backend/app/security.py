@@ -71,6 +71,8 @@ def create_access_token(user_id: str) -> str:
         "iat": now,
         "exp": now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
         "type": "access",
+        # iat has 1s resolution; jti keeps two tokens minted in the same second distinct.
+        "jti": secrets.token_hex(8),
     }
 
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)

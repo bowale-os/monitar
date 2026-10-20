@@ -631,7 +631,10 @@ function renderSessions(sessions) {
 async function loadSessions() {
   try {
     const { data } = await api.listSessions();
-    renderSessions(data || []);
+    const sorted = [...(data || [])].sort(
+      (a, b) => new Date(b.started_at) - new Date(a.started_at)
+    );
+    renderSessions(sorted);
   } catch (err) {
     handleError(err);
   }
