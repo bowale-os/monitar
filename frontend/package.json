@@ -5,10 +5,14 @@
   "type": "module",
   "description": "Monitar browser extension - unit tests for the pure helpers in extension/helpers.js",
   "scripts": {
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
     "vitest": "^2.1.9"
   }
 }

@@ -1,0 +1,21 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+# Deliberately conservative: pyflakes + pycodestyle errors only. Style rules
+# that would only churn existing code are left off.
+select = ["E", "F"]
+ignore = ["F401", "F841", "E501", "E401", "E402", "E701", "E702", "E711", "E712", "E722", "E731", "E741"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["backend/app"]
+ignore_missing_imports = true
+check_untyped_defs = false
+disallow_untyped_defs = false
+exclude = ["backend/app/tests/"]
+# Pre-existing, benign: os.getenv() is Optional (security.py validates it at import)
+# and the Mongo client has no annotation. Left as is rather than churn working code.
+disable_error_code = ["assignment", "var-annotated"]
