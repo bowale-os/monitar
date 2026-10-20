@@ -175,12 +175,14 @@ accountForm.addEventListener("submit", async (e) => {
         ? await api.signUp(nameInput.value.trim(), email, password)
         : await api.signIn(email, password);
 
-    await setTokens(res);
+    // Validate and derive the key before saving tokens, so a bad response or a failed
+    // derivation never leaves the user signed in without an encryption key.
     if (!res.enc_salt) {
       showStatus(accountStatus, "Encryption is not working at the moment. Please contact admin.");
       return;
     }
     await deriveAndStoreKey(password, res.enc_salt);
+    await setTokens(res);
     accountForm.reset();
     if (skippedToSignup) {
       await markOnboarded();

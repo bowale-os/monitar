@@ -19,6 +19,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Monitar", lifespan=lifespan)
 
+# Wide-open CORS is acceptable here because auth is a bearer header, not a
+# cookie (allow_credentials=False), so browsers cannot be tricked into sending
+# ambient credentials. It could be narrowed to the extension's origin.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

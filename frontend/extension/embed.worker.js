@@ -5,6 +5,8 @@ import { pipeline, env } from "./lib/transformers.min.js";
 // use and are cached by the browser's Cache API.
 env.backends.onnx.wasm.wasmPaths = new URL("./lib/", self.location.href).href;
 env.allowLocalModels = false;
+// Multi-threaded WASM needs SharedArrayBuffer, which needs cross-origin
+// isolation that extension pages don't have. Single-threaded is slower but works.
 env.backends.onnx.wasm.numThreads = 1; // ← disable multi-threading
 env.backends.onnx.wasm.proxy = false; // ← don't proxy through a blob worker
 
@@ -12,7 +14,6 @@ const MODEL_ID = "Xenova/all-MiniLM-L6-v2";
 
 let extractor = null;
 let loadingPromise = null;
-const queue = [];
 
 async function loadModel() {
   if (extractor) return extractor;
@@ -21,6 +22,8 @@ async function loadModel() {
   loadingPromise = (async () => {
     self.postMessage({ type: "status", message: "Downloading smart search model…" });
     extractor = await pipeline("feature-extraction", MODEL_ID, {
+      // Quantized weights are roughly a quarter of the size, which matters for the
+      // first-run download, at a small cost in embedding accuracy.
       quantized: true,
       progress_callback: (progress) => {
         if (progress.status === "progress") {
@@ -42,20 +45,11 @@ async function loadModel() {
 
 async function embed(text) {
   const model = await loadModel();
+  // Mean-pool the token vectors into one 384-d sentence vector and L2-normalize
+  // it. The backend relies on that: it scores with a plain dot product, which
+  // equals cosine similarity only for unit vectors.
   const output = await model(text, { pooling: "mean", normalize: true });
   return Array.from(output.data);
-}
-
-// Drain the queue once the model is ready.
-async function processQueue() {
-  for (const { id, text, resolve, reject } of queue) {
-    try {
-      resolve(await embed(text));
-    } catch (e) {
-      reject(e);
-    }
-  }
-  queue.length = 0;
 }
 
 self.addEventListener("message", async ({ data }) => {

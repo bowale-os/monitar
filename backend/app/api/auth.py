@@ -48,6 +48,9 @@ async def issue_refresh_token(user_id: str) -> str:
 @a_router.post("/sign-up", status_code=status.HTTP_201_CREATED)
 async def sign_up(request: SignUpRequest):
     
+    # Per-user salt for the client-side PBKDF2 key derivation. It is not secret;
+    # it just makes each user's AES key unique. It is returned on every sign-in
+    # so any device can re-derive the same key from the same password.
     salt = base64.b64encode(os.urandom(16)).decode()
     data = request.model_dump()
 
@@ -120,9 +123,6 @@ async def refresh(request: RefreshRequest):
     """
     token_hash = hash_refresh_token(request.refresh_token)
 
-    # check if it exists before deleting
-    existing = await database.refresh_tokens.find_one({"token_hash": token_hash})
-
     # Atomically consume the token: only one rotation can win.
     record = await database.refresh_tokens.find_one_and_delete({"token_hash": token_hash})
 
@@ -141,6 +141,8 @@ async def refresh(request: RefreshRequest):
     if datetime.now(timezone.utc) > expires_at:
         raise invalid_token
 
+    # Tokens store user_id as a string, but users._id is an ObjectId, so convert
+    # back for the lookup. A deleted account makes its tokens useless here.
     user_id = record["user_id"]
     user = await database.users.find_one({"_id": ObjectId(user_id)})
     
@@ -149,6 +151,9 @@ async def refresh(request: RefreshRequest):
     access_token = create_access_token(user_id)
     refresh_token = await issue_refresh_token(user_id)
 
+    # enc_salt is returned again so a client that lost local state can recover the
+    # encryption key (it still needs the password, which the server never sees
+    # at refresh time).
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -159,6 +164,8 @@ async def refresh(request: RefreshRequest):
 @a_router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout(request: RefreshRequest):
     """Revoke the presented refresh token server-side."""
+    # Deleting an unknown or already-used token is a no-op, so logout is
+    # idempotent and never reveals whether the token was valid.
     token_hash = hash_refresh_token(request.refresh_token)
     await database.refresh_tokens.delete_one({"token_hash": token_hash})
     return {"message": "Logged out"}

@@ -23,6 +23,8 @@ function getWorker() {
   if (_worker) return _worker;
   _worker = new Worker(chrome.runtime.getURL("embed.worker.js"), { type: "module" });
   _worker.addEventListener("message", ({ data }) => {
+    // Messages with a `type` are model-loading status updates. Replies to embed()
+    // carry an `id` instead and fall through to the _pending lookup below.
     if (data.type === "download_progress") return;
     if (data.type === "status") {
       if (data.message === "ready") {
@@ -42,6 +44,8 @@ function getWorker() {
   return _worker;
 }
 
+// The worker answers asynchronously over postMessage, so each request carries
+// an id and its promise callbacks wait in _pending until the matching reply.
 function embed(text) {
   return new Promise((resolve, reject) => {
     const id = ++_reqId;
@@ -213,6 +217,9 @@ async function refreshSessionUI() {
     activeIntent.textContent = status.intent || "Untitled session";
     activeMeta.textContent =
       `Tracking · ${status.tabCount} tab${status.tabCount === 1 ? "" : "s"} · since ${formatSince(status.started_at)}`;
+      // Watchdog for the background autosave: it runs every minute, so five
+      // minutes without a successful flush (or two minutes with none at all)
+      // means saves are failing, usually offline or an expired session.
       if (status.lastFlushAt) {
         const secondsSinceFlush = (Date.now() - new Date(status.lastFlushAt)) / 1000;
         if (secondsSinceFlush > 300) {
@@ -663,6 +670,9 @@ async function restoreSession(id, btn) {
       return;
     }
 
+    // Tab group ids are per-browser and meaningless after a restart, so groups
+    // are rebuilt: open the tabs first, then map each saved group's tab indices
+    // onto the freshly created tabs and group those.
     const createdWindowIds = [];
 
     for (const [, windowData] of Object.entries(payload.windows)) {
@@ -1045,7 +1055,8 @@ async function handleStop() {
   clearStatus();
   stopBtn.disabled = true;
   try {
-    // Compute the embedding BEFORE stopping, then stop with it.
+    // Compute the embedding BEFORE stopping, then stop with it. STOP_SESSION clears
+    // the session state, so the payload must be read while it still exists.
     showStatus("Saving session...", "success");
     const vector = await computeSessionVector();
     await chrome.runtime.sendMessage({ type: "STOP_SESSION", vector });
@@ -1071,11 +1082,15 @@ async function handleAuth(e) {
         ? await api.signUp(nameInput.value.trim(), email, password)
         : await api.signIn(email, password);
 
-    await setTokens(res);
+    // Check the salt before persisting anything, so a bad response never leaves the
+    // user looking signed in with no way to decrypt.
     if (!res.enc_salt) {
       showStatus("Encryption is not working at the moment. Please, contact admin.");
       return;
     }
+    // The password is only available here, at sign-in, so the encryption key is
+    // derived now. It is never stored; only the derived key goes to session storage.
+    // Tokens are saved last: if derivation throws, the user stays signed out.
     await deriveAndStoreKey(password, res.enc_salt);
     await setTokens(res);
     authForm.reset();
@@ -1262,6 +1277,8 @@ emailInput.addEventListener("input", saveAuthDraft);
 nameInput.addEventListener("input", saveAuthDraft);
 intentInput.addEventListener("input", saveIntentDraft);
 
+// The popup stays open while the user works in other windows, and the session
+// list can go stale (autosave, another device). Refresh whenever it regains focus.
 window.addEventListener("focus", async () => {   // ← add this
   const { access_token } = await getTokens();
   if (access_token) {
@@ -1287,6 +1304,8 @@ window.addEventListener("focus", async () => {   // ← add this
       await loadSessions();
       return;
     }
+    // The tokens survive a browser restart (storage.local) but the key does not
+    // (storage.session), so the user must re-enter the password to decrypt.
     // key gone, need the password again — fall through to auth/nudge
   }
 

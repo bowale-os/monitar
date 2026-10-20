@@ -13,6 +13,9 @@ async def store(payload: Session,
                 current_user_id = Depends(get_current_user_id)):
     
     data = payload.model_dump()
+    # _id and user_id are always assigned server-side, so a client cannot choose
+    # its own id or write into another user's account. content_encrypted is
+    # stored exactly as received; the server never sees the plaintext.
     session_id = uuid.uuid4()
 
     data["_id"] = str(session_id)
@@ -34,9 +37,13 @@ async def update_session(
     current_user_id = Depends(get_current_user_id)
 ):
 
+    # The extension re-sends the whole envelope on every autosave, so this is a
+    # full overwrite of the Session fields rather than a partial patch. created_at
+    # is excluded because model_dump() would regenerate it as "now" and clobber the
+    # original; updated_at is meant to refresh on every save, so it stays.
     result = await database.sessions.update_one(
         {"_id": session_id, "user_id": current_user_id},   # 1. which doc to match
-        {"$set": request.model_dump()}                     # 2. what to change
+        {"$set": request.model_dump(exclude={"created_at"})}                     # 2. what to change
     )
 
     if result.matched_count == 0:

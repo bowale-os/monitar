@@ -45,6 +45,10 @@ async function rawFetch(path, { method = "GET", body, token } = {}) {
 
 // Rotate the refresh token; returns a fresh access token or throws
 // SessionExpiredError (and clears storage) if it can't.
+// Single-flight: several requests can hit a 401 at the same moment, and refresh
+// tokens rotate on use. If each one refreshed independently, all but the first
+// would present an already-consumed token and be logged out. So they share one
+// in-flight promise instead.
 let refreshPromise = null;
 
 async function doRefresh() {
@@ -89,6 +93,8 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
 
   let { res, data } = await rawFetch(path, { method, body, token });
 
+  // Retry exactly once. A second 401 after a successful refresh means the
+  // problem isn't an expired token, so surface it instead of looping.
   if (auth && res.status === 401) {
     const newToken = await doRefresh(); // throws SessionExpiredError if it fails
     ({ res, data } = await rawFetch(path, { method, body, token: newToken }));

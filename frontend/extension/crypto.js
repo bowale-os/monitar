@@ -1,5 +1,7 @@
 // crypto.js
 
+// Storage key for the exported AES key in chrome.storage.session. The odd name
+// just avoids colliding with any other key; it is not a secret.
 const KEY_STORAGE = "23wdf@#%^&^&fvfbxfy74sdf$#$@#$%^";
 
 function bufferToBase64(buffer) {
@@ -19,6 +21,12 @@ function base64ToBuffer(base64) {
   return bytes.buffer;
 }
 
+// Derive the AES-256-GCM key from the password and the server-issued per-user
+// salt, then keep it in session storage (memory only, cleared when the browser
+// closes). The same password + salt always yields the same key, which is what
+// lets any device decrypt sessions without the key ever being uploaded.
+// 100k PBKDF2 iterations keeps sign-in snappy; see docs/ARCHITECTURE.md for the
+// trade-off.
 export async function deriveAndStoreKey(password, saltBase64) {
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
@@ -63,6 +71,9 @@ export async function clearKey() {
   await chrome.storage.session.remove(KEY_STORAGE);
 }
 
+// Output layout is base64( IV[12] || ciphertext+tag ). A fresh random IV per
+// call is essential: reusing an IV with the same AES-GCM key breaks its
+// confidentiality and authenticity guarantees.
 export async function encrypt(key, obj) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(JSON.stringify(obj));
@@ -80,6 +91,9 @@ export async function encrypt(key, obj) {
   return bufferToBase64(combined.buffer);
 }
 
+// Splits the IV back off the front. GCM authenticates as well as decrypts, so
+// a wrong key or tampered data makes subtle.decrypt reject. Callers treat that
+// as "this session can't be read" rather than as a crash.
 export async function decrypt(key, base64) {
   const combined = new Uint8Array(base64ToBuffer(base64));
   const iv = combined.slice(0, 12);
@@ -95,6 +109,9 @@ export async function decrypt(key, base64) {
 }
 
 
+// Change detection only, not integrity. JSON.stringify is order-sensitive, but
+// the payload is always built by the same code, so identical content hashes
+// identically and background.js can skip redundant uploads.
 export async function hashPayload(payload) {
   const encoded = new TextEncoder().encode(JSON.stringify(payload));
   const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);

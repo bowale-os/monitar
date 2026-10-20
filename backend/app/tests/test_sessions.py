@@ -78,6 +78,18 @@ def test_update_changes_the_session(authed_client, db):
     assert db.sessions.find_one({"_id": session_id})["intent"] == "renamed"
 
 
+def test_update_keeps_created_at_and_refreshes_updated_at(authed_client, db):
+    client, token, _ = authed_client
+    session_id = _store(client, token)
+    before = db.sessions.find_one({"_id": session_id})
+
+    client.put(f"/{session_id}", json={**PAYLOAD, "intent": "renamed"}, headers=_auth(token))
+
+    after = db.sessions.find_one({"_id": session_id})
+    assert after["created_at"] == before["created_at"]
+    assert after["updated_at"] > before["updated_at"]
+
+
 def test_update_unknown_session_returns_404(authed_client):
     client, token, _ = authed_client
     resp = client.put("/nope", json=PAYLOAD, headers=_auth(token))

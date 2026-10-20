@@ -152,12 +152,18 @@ async function flush(vector = null) {
     return true;
   }
 
+  // Nothing changed since the last successful upload, so skip the network call.
+  // lastHash is only updated after a successful save, so a failed upload is
+  // retried on the next alarm instead of being skipped.
   const hash = await hashPayload(payload);
   if (hash === s.lastHash) {
     await setState(s);
     return true;
   }
 
+  // The key lives in chrome.storage.session, which is wiped when the browser
+  // closes. After a restart the user must sign in again; until then we keep
+  // tracking locally but cannot upload anything readable.
   const key = await loadKey();
   if (!key) {
     console.warn("[monitar] no encryption key available, skipping flush");
@@ -209,6 +215,8 @@ async function abortSession() {
 
 // --- tab event listeners (only act while a session is active) ---
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  // onUpdated fires for many irrelevant reasons (favicon, loading spinner, audio).
+  // Only react when the URL or title changed, or the page finished loading.
   if (!changeInfo.url && !changeInfo.title && changeInfo.status !== "complete") return;
   const s = await getState();
   if (!s) return;
@@ -217,6 +225,8 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   const existing = s.tabs[tabId];
   if (!existing) {
     // A newly navigated tab joins the session.
+    // Exactly one tab is flagged is_last_opened: the most recent addition. It
+    // marks where the user's browsing trail ended.
     for (const id in s.tabs) s.tabs[id].is_last_opened = false;
     
     s.tabs[tabId] = newTabRecord(
@@ -257,6 +267,8 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   await setState(s); // keep the closed tab's record in the session
 });
 
+// Alarms (unlike setInterval) survive the service worker being suspended, so
+// this is what keeps autosave running while the worker is idle.
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) flush();
 });

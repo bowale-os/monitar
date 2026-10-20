@@ -9,6 +9,8 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 mongo_connect = os.getenv("MONGODB_CONNECT")
 
+# The client connects lazily on first use, so importing this module (for
+# example in tests or scripts) does not require a reachable database.
 mongo_client = AsyncMongoClient(mongo_connect)
 
 # DB name is configurable so tests can run against a throwaway database.

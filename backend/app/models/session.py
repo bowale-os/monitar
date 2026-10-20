@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from .tab import Tab
 
+# Serialize datetimes as ISO-8601 with a trailing Z, which is what the
+# extension's parseDate() in helpers.js expects.
 class BaseSchema(BaseModel):
     model_config = ConfigDict(
         json_encoders={datetime: lambda v: v.isoformat().replace("+00:00", "Z")}
@@ -13,6 +15,9 @@ class Session(BaseSchema):
     started_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # content_encrypted is base64(IV || AES-GCM ciphertext); content_hash is the
+    # SHA-256 of the plaintext payload, used client-side to skip no-op uploads.
+    # embedding is the only content-derived field the server can read.
     content_encrypted: Optional[str] = None
     content_hash: Optional[str] = None
     embedding: Optional[List[float]] = None

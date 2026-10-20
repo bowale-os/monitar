@@ -19,6 +19,10 @@ async def search_sessions(
     body: SearchRequest,
     current_user_id=Depends(get_current_user_id),
 ):
+    # Scope to the caller first, then fetch only what ranking needs. The
+    # projection leaves out content_encrypted, which is by far the largest field
+    # and is irrelevant for scoring. Sessions still being recorded have no
+    # embedding yet, so they are skipped here.
     sessions = await database.sessions.find(
         {"user_id": current_user_id, "embedding": {"$ne": None, "$exists": True}},
         {"_id": 1, "intent": 1, "started_at": 1, "tab_count": 1, "window_count": 1, "embedding": 1},
@@ -27,6 +31,10 @@ async def search_sessions(
     if not sessions:
         return {"data": []}
 
+    # Normalize the query so the dot product below equals cosine similarity. The
+    # extension already stores unit-length vectors (normalize: true in
+    # embed.worker.js), so only the query needs it. A zero vector is left as is
+    # to avoid dividing by zero; every score then comes out 0.
     query = np.array(body.vector, dtype=np.float32)
     norm = np.linalg.norm(query)
     if norm > 0:
@@ -45,13 +53,19 @@ async def search_sessions(
             "score": score,
         })
 
+    # Exact linear scan: O(sessions x 384). Fine at personal scale (see
+    # scripts/bench_search.py); a vector index would be needed far beyond that.
     results.sort(key=lambda x: x["score"], reverse=True)
     return {"data": results[: body.limit]}
 
 
+# Route order matters: this catch-all path would swallow /privacy, which is
+# why main.py registers that route before including this router.
 @r_router.get("/{session_id}", status_code=status.HTTP_200_OK)
 async def get_session(session_id: str, current_user_id = Depends(get_current_user_id)):
     
+    # Filtering on user_id as well as _id means another user's session id is
+    # indistinguishable from a missing one (both 404), so ids cannot be probed.
     try: 
         session_data = await database.sessions.find_one({
             "_id": session_id,

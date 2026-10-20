@@ -278,7 +278,74 @@ These are known and deliberate, not oversights.
 7. **Open CORS.** `allow_origins=["*"]` with `allow_credentials=False`. Auth is a bearer header, not a cookie, so this does not open a CSRF path, but it could be narrowed to the extension origin.
 8. **Model download.** The ONNX runtime is bundled, but the MiniLM weights download from HuggingFace on first use and are then cached by the browser. No page content is sent there.
 
-## 9. Testing and quality
+## 9. Design decisions
+
+Each entry records the situation, the options weighed, what was chosen, and what that costs.
+
+### D1. Compute embeddings in the browser
+
+- **Context:** Semantic search needs a vector per session. Sending page text to a hosted embedding API would expose browsing content to a third party.
+- **Options:** (a) hosted API such as OpenAI or Vertex, (b) run a small model on the backend, (c) run a small model in the extension.
+- **Decision:** (c), `Xenova/all-MiniLM-L6-v2` quantized, on ONNX/WASM in a worker.
+- **Consequences:** No third party sees titles or URLs, and there is no per-request cost. The price is a first-run model download, single-threaded inference (extension pages lack cross-origin isolation), and a smaller model than a hosted API would offer.
+
+### D2. Encrypt in the browser with a password-derived key
+
+- **Context:** A database leak should not expose browsing history.
+- **Options:** (a) server-side encryption at rest only, (b) a random key stored with the account, (c) a key derived from the password in the client.
+- **Decision:** (c), PBKDF2-SHA256 into AES-256-GCM, with a per-user salt held by the server.
+- **Consequences:** The server stores ciphertext it cannot decrypt, and any device with the password can read sessions. The cost is that a forgotten password makes the data unrecoverable, and the password also reaches the server at sign-in (see section 8).
+
+### D3. Ship plaintext embeddings alongside ciphertext
+
+- **Context:** Ranking on the server needs readable vectors, but readable vectors leak the topic of a session.
+- **Options:** (a) no semantic search, only client-side keyword search, (b) download and decrypt everything to rank locally, (c) store the embedding in plaintext.
+- **Decision:** (c) for semantic search, with keyword search kept fully client-side as a complement.
+- **Consequences:** Search stays fast and the payload stays private, but topic-level information is visible to the server. This is stated openly in the README and in section 2.
+
+### D4. Exact linear scan instead of a vector index
+
+- **Context:** Each user has dozens to low thousands of sessions.
+- **Options:** (a) NumPy dot product over the user's sessions, (b) Atlas Vector Search, (c) an ANN library such as FAISS or hnswlib.
+- **Decision:** (a).
+- **Consequences:** Exact results, no extra infrastructure, and latency in the tens of milliseconds at 1,000 sessions (see the README benchmarks). It grows linearly, so it is the first thing to replace if usage grows far beyond personal scale.
+
+### D5. Short-lived JWTs plus rotating, hashed refresh tokens
+
+- **Context:** The extension needs to stay signed in for days without keeping a long-lived bearer secret that works forever.
+- **Options:** (a) one long-lived JWT, (b) a session cookie, (c) 15-minute access JWT with a rotating opaque refresh token.
+- **Decision:** (c), with refresh tokens stored only as SHA-256 hashes, consumed atomically on use, and purged by a TTL index.
+- **Consequences:** A stolen access token expires quickly, a leaked database yields no usable refresh tokens, and a replayed token fails. The client must handle refresh races, which `api.js` does with a single shared in-flight refresh.
+
+### D6. Keep all session state in `chrome.storage`
+
+- **Context:** MV3 service workers are suspended when idle and restarted on events, so module-level variables disappear without warning.
+- **Options:** (a) keep state in memory and rebuild on wake, (b) persist every change to storage.
+- **Decision:** (b). `background.js` reads state at the start of each event and writes it back at the end, and autosave uses `chrome.alarms`, which survives suspension.
+- **Consequences:** Tracking survives worker restarts and popup closes. The cost is more storage reads and writes, and every handler must be written as read, modify, write.
+
+### D7. Hash-gated, full-envelope autosave
+
+- **Context:** A session is saved every minute, but most minutes nothing changes.
+- **Options:** (a) upload on every tick, (b) send diffs, (c) upload the whole encrypted envelope only when the content hash changes.
+- **Decision:** (c).
+- **Consequences:** Simple server logic (one `PUT` that overwrites) and no wasted uploads. Diffs would be smaller on the wire but cannot work well over ciphertext, since one change re-encrypts the whole payload anyway.
+
+### D8. Two search engines merged in the popup
+
+- **Context:** Semantic search finds related topics but can miss an exact URL fragment, and keyword search is the reverse.
+- **Options:** (a) semantic only, (b) keyword only, (c) both in parallel with de-duplication.
+- **Decision:** (c). Keyword results render first with highlighting, and semantic-only matches follow, labelled as related by topic.
+- **Consequences:** Better recall, and either engine can fail without breaking search. Keyword search decrypts every session, so a per-session decrypt cache in `chrome.storage.session` keeps it fast.
+
+### D9. A byte-identical store-packaging copy of the extension
+
+- **Context:** The Chrome Web Store upload lives in `frontend/uploadzip/extension`, separate from the development copy.
+- **Options:** (a) a build step that generates one from the other, (b) a manual copy guarded by a test.
+- **Decision:** (b). A Vitest check fails CI if the two directories differ.
+- **Consequences:** No build tooling for a vanilla-JS extension, at the price of editing both copies. A build step becomes worthwhile if the extension grows a bundler.
+
+## 10. Testing and quality
 
 | Layer | Tooling | What it covers |
 |-------|---------|----------------|
